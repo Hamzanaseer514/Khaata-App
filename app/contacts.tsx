@@ -3,14 +3,14 @@ import { showError } from '@/utils/toast';
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    FlatList,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import config from '../config/config';
 
@@ -36,14 +36,11 @@ export default function ContactsListScreen() {
     fetchContacts();
   }, []);
 
-  // Refresh contacts when screen comes into focus (e.g., returning from contact detail)
+  // Refresh contacts whenever screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      // Only refresh if we already have contacts loaded (not initial load)
-      if (contacts.length > 0) {
-        fetchContacts(true);
-      }
-    }, [contacts.length])
+      fetchContacts(true);
+    }, [])
   );
 
   const fetchContacts = async (isRefresh = false) => {
