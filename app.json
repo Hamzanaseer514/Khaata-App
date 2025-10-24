@@ -7,11 +7,13 @@
     "icon": "./assets/images/icon.png",
     "scheme": "khaataapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.khaata.app"   
     },
     "android": {
+      "package": "com.khaata.app",   
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
