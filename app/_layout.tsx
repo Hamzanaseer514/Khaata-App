@@ -34,6 +34,7 @@ export default function RootLayout() {
             <Stack.Screen name="notifications" options={{ headerShown: false }} />
             <Stack.Screen name="reports" options={{ headerShown: false }} />
             <Stack.Screen name="settings" options={{ headerShown: false }} />
+            <Stack.Screen name="personal-khaata" options={{ headerShown: false }} />
             <Stack.Screen name="change-password" options={{ headerShown: false }} />
             <Stack.Screen name="privacy-policy" options={{ headerShown: false }} />
             <Stack.Screen name="terms-of-service" options={{ headerShown: false }} />

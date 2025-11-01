@@ -175,32 +175,17 @@ export default function LoginScreen() {
                   </Text>
                 </TouchableOpacity>
 
-                {/* Divider */}
-                <View style={styles.divider}>
-                  <View style={styles.dividerLine} />
-                  <Text style={styles.dividerText}>OR</Text>
-                  <View style={styles.dividerLine} />
-                </View>
-
-                {/* Social Login */}
-                <View style={styles.socialContainer}>
-                  <TouchableOpacity style={styles.socialButton}>
-                    <Text style={styles.socialIcon}>G</Text>
-                    <Text style={styles.socialText}>Google</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.socialButton}>
-                    <Text style={styles.socialIcon}>🍎</Text>
-                    <Text style={styles.socialText}>Apple</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Sign Up Link */}
-                <View style={styles.signupContainer}>
+                {/* Sign Up Link (below login button) */}
+                <View style={[styles.signupContainer, { marginTop: 12, marginBottom: 20 }]}>
                   <Text style={styles.signupText}>Don't have an account? </Text>
                   <TouchableOpacity onPress={() => router.push('/register')}>
                     <Text style={styles.signupLink}>Sign up</Text>
                   </TouchableOpacity>
                 </View>
+
+                {/* Social login removed */}
+
+                {/* Sign Up Link location adjusted above */}
               </View>
             )}
           </Formik>
@@ -253,7 +238,7 @@ const styles = StyleSheet.create({
   formSection: {
     flex: 1,
     paddingHorizontal: 30,
-    paddingTop: 40,
+    paddingTop: 60,
   },
   form: {
     flex: 1,

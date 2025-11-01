@@ -40,7 +40,7 @@ export default function TermsOfServiceScreen() {
   };
 
   const handleEmail = () => {
-    const email = 'ameerhamzauet1026@gmail.com';
+    const email = 'khaataapp.co@gmail.com';
     const subject = 'Khaata App - Terms of Service Query';
     const body = 'Hello,\n\nI have a question about the terms of service:\n\n';
     const url = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -181,7 +181,7 @@ export default function TermsOfServiceScreen() {
 
             <TouchableOpacity style={styles.contactButton} onPress={handleEmail}>
               <Text style={styles.contactIcon}>📧</Text>
-              <Text style={styles.contactText}>Email: ameerhamzauet1026@gmail.com</Text>
+              <Text style={styles.contactText}>Email: khaataapp.co@gmail.com</Text>
             </TouchableOpacity>
           </View>
         </View>

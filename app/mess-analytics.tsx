@@ -3,12 +3,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 const monthNames = [
@@ -56,6 +57,8 @@ export default function MessAnalyticsScreen() {
   const [monthlySummary, setMonthlySummary] = useState<MonthlySummary | null>(null);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [showYearDropdown, setShowYearDropdown] = useState(false);
   
   // Date range state
   const [startDate, setStartDate] = useState(new Date());
@@ -88,7 +91,15 @@ export default function MessAnalyticsScreen() {
         headers: { 'Authorization': `Bearer ${token}` },
       });
       const data = await res.json();
-      if (data.success) setMonths(data.data.months || []);
+      if (data.success) {
+        const loadedMonths = data.data.months || [];
+        setMonths(loadedMonths);
+        // Set selected year to the latest year in the data, or current year
+        if (loadedMonths.length > 0) {
+          const latestYear = Math.max(...loadedMonths.map((m: any) => m.year));
+          setSelectedYear(latestYear);
+        }
+      }
     } catch (e) {
       console.log('Failed to load months', e);
     }
@@ -266,19 +277,95 @@ export default function MessAnalyticsScreen() {
       </View>
 
       {/* Months with data - tap to open analytics for that month */}
-      {months.length > 0 && (
-        <View style={styles.summaryCard}>
-          <Text style={[styles.summaryTitle, { textAlign: 'center', marginBottom: 10 }]}>📆 Months with data</Text>
-          <View style={styles.monthsGrid}>
-            {months.map((m) => (
-              <TouchableOpacity key={`${m.year}-${m.month}`} style={styles.monthPill} onPress={() => loadSpecificMonth(m.year, m.month)}>
-                <Text style={styles.monthPillLabel}>{m.label}</Text>
-                <Text style={styles.monthPillSub}>₹{m.totalAmount.toFixed(0)} • {m.totalMeals}</Text>
+      {months.length > 0 && (() => {
+        // Get unique years from months data
+        const uniqueYears = [...new Set(months.map(m => m.year))].sort((a, b) => b - a);
+        
+        // Filter months by selected year
+        const filteredMonths = months.filter(m => m.year === selectedYear);
+        
+        return (
+          <View style={styles.summaryCard}>
+            <Text style={[styles.summaryTitle, { textAlign: 'center', marginBottom: 15 }]}>📆 Months with data</Text>
+            
+            {/* Year Filter Dropdown */}
+            <View style={styles.yearFilterContainer}>
+              <Text style={styles.yearFilterLabel}>Filter by Year:</Text>
+              <TouchableOpacity
+                style={styles.yearDropdown}
+                onPress={() => setShowYearDropdown(true)}
+              >
+                <Text style={styles.yearDropdownText}>{selectedYear}</Text>
+                <Text style={styles.yearDropdownArrow}>▼</Text>
               </TouchableOpacity>
-            ))}
+              
+              {/* Year Dropdown Modal */}
+              <Modal
+                visible={showYearDropdown}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowYearDropdown(false)}
+              >
+                <TouchableOpacity
+                  style={styles.modalOverlay}
+                  activeOpacity={1}
+                  onPress={() => setShowYearDropdown(false)}
+                >
+                  <View style={styles.dropdownContainer} onStartShouldSetResponder={() => true}>
+                    <View style={styles.dropdownHeader}>
+                      <Text style={styles.dropdownTitle}>Select Year</Text>
+                      <TouchableOpacity onPress={() => setShowYearDropdown(false)}>
+                        <Text style={styles.dropdownClose}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <ScrollView style={styles.dropdownScroll}>
+                      {uniqueYears.map((year) => (
+                        <TouchableOpacity
+                          key={year}
+                          style={[
+                            styles.dropdownItem,
+                            selectedYear === year && styles.dropdownItemSelected
+                          ]}
+                          onPress={() => {
+                            setSelectedYear(year);
+                            setShowYearDropdown(false);
+                          }}
+                        >
+                          <Text style={[
+                            styles.dropdownItemText,
+                            selectedYear === year && styles.dropdownItemTextSelected
+                          ]}>
+                            {year}
+                          </Text>
+                          {selectedYear === year && (
+                            <Text style={styles.dropdownItemCheck}>✓</Text>
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                </TouchableOpacity>
+              </Modal>
+            </View>
+            
+            {/* Filtered Months Grid */}
+            {filteredMonths.length > 0 ? (
+              <View style={styles.monthsGrid}>
+                {filteredMonths.map((m) => (
+                  <TouchableOpacity key={`${m.year}-${m.month}`} style={styles.monthPill} onPress={() => loadSpecificMonth(m.year, m.month)}>
+                    <Text style={styles.monthPillLabel}>{m.monthName}</Text>
+                    <Text style={styles.monthPillSub}>₹{m.totalAmount.toFixed(0)} • {m.totalMeals} meals</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.noMonthsContainer}>
+                <Text style={styles.noMonthsText}>No months found for {selectedYear}</Text>
+              </View>
+            )}
           </View>
-        </View>
-      )}
+        );
+      })()}
 
       {/* Selected Month Summary */}
       {monthlySummary && (
@@ -706,5 +793,110 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#7f8c8d',
     marginTop: 4,
+  },
+  yearFilterContainer: {
+    marginBottom: 15,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  yearFilterLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: 10,
+  },
+  yearDropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  yearDropdownText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#2c3e50',
+  },
+  yearDropdownArrow: {
+    fontSize: 12,
+    color: '#7f8c8d',
+    marginLeft: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dropdownContainer: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    width: '80%',
+    maxHeight: '60%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  dropdownHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  dropdownTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+  },
+  dropdownClose: {
+    fontSize: 20,
+    color: '#7f8c8d',
+    fontWeight: 'bold',
+  },
+  dropdownScroll: {
+    maxHeight: 300,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  dropdownItemSelected: {
+    backgroundColor: '#f0f9ff',
+  },
+  dropdownItemText: {
+    fontSize: 16,
+    color: '#2c3e50',
+  },
+  dropdownItemTextSelected: {
+    color: '#20B2AA',
+    fontWeight: '600',
+  },
+  dropdownItemCheck: {
+    fontSize: 18,
+    color: '#20B2AA',
+    fontWeight: 'bold',
+  },
+  noMonthsContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  noMonthsText: {
+    fontSize: 14,
+    color: '#7f8c8d',
+    fontStyle: 'italic',
   },
 });

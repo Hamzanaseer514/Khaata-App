@@ -4,17 +4,17 @@ import { showError, showSuccess } from '@/utils/toast';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    FlatList,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 const monthNames = [
@@ -27,6 +27,7 @@ interface MessRecord {
   date: string;
   mealType: 'Breakfast' | 'Lunch' | 'Dinner';
   price: number;
+  personCount?: number;
   createdAt: string;
 }
 
@@ -41,7 +42,15 @@ export default function MessScreen() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [mealType, setMealType] = useState<'Breakfast' | 'Lunch' | 'Dinner'>('Breakfast');
   const [price, setPrice] = useState('');
+  const [personCount, setPersonCount] = useState('1');
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  
+  // Year and Month filter state
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
+  const [showYearDropdown, setShowYearDropdown] = useState(false);
+  const [showMonthDropdown, setShowMonthDropdown] = useState(false);
   
 
 
@@ -94,7 +103,15 @@ export default function MessScreen() {
       console.log('Records success response:', data);
       
       if (data.success) {
-        setRecords(data.data.records || []);
+        const loadedRecords = data.data.records || [];
+        setRecords(loadedRecords);
+        // Set selected year and month to the latest date in the data, or current date
+        if (loadedRecords.length > 0) {
+          const latestRecord = loadedRecords[0]; // Records are already sorted by date descending
+          const latestDate = new Date(latestRecord.date);
+          setSelectedYear(latestDate.getFullYear());
+          setSelectedMonth(latestDate.getMonth() + 1);
+        }
       } else {
         showError(data.message || 'Failed to load records');
         setRecords([]);
@@ -130,12 +147,19 @@ export default function MessScreen() {
       return;
     }
 
+    const personCountNum = parseInt(personCount);
+    if (isNaN(personCountNum) || personCountNum < 1) {
+      showError('Please enter a valid person count (minimum 1)');
+      return;
+    }
+
     console.log('Adding record with:', {
       userId: user.id,
       token: token ? 'Present' : 'Missing',
       date: selectedDate.toISOString().split('T')[0],
       mealType,
       price: priceNum,
+      personCount: personCountNum,
       url: `${config.BASE_URL}/mess/add`
     });
 
@@ -151,34 +175,62 @@ export default function MessScreen() {
           date: selectedDate.toISOString().split('T')[0],
           mealType,
           price: priceNum,
+          personCount: personCountNum,
         }),
       });
 
       console.log('Response status:', response.status);
       console.log('Response headers:', response.headers);
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.log('Error response:', errorText);
-        throw new Error(`Server error: ${response.status} - ${errorText}`);
+      // Clone response to read as text if JSON parsing fails
+      const responseClone = response.clone();
+      let responseData;
+      
+      try {
+        responseData = await response.json();
+        console.log('Response data:', responseData);
+      } catch (jsonError) {
+        // If response is not JSON, read as text from clone
+        try {
+          const errorText = await responseClone.text();
+          console.log('Non-JSON error response:', errorText);
+          showError(`Server error: ${response.status}`);
+        } catch (textError) {
+          showError(`Server error: ${response.status}`);
+        }
+        return;
       }
 
-      const data = await response.json();
-      console.log('Success response:', data);
+      if (!response.ok) {
+        // Backend returns proper error messages in JSON format
+        const errorMessage = responseData.message || `Server error: ${response.status}`;
+        console.log('Error message:', errorMessage);
+        showError(errorMessage);
+        return;
+      }
       
-      if (data.success) {
+      if (responseData.success) {
         showSuccess('Record added successfully!');
         setPrice('');
+        setPersonCount('1');
+        setSelectedDate(new Date());
+        setMealType('Breakfast');
+        setShowAddModal(false);
         loadRecords();
       } else {
-        showError(data.message || 'Failed to add record');
+        showError(responseData.message || 'Failed to add record');
       }
     } catch (error) {
       console.error('Error adding record:', error);
       if (error instanceof SyntaxError) {
         showError('Unable to connect to server. Please check if the backend is running.', 'Connection Error');
       } else {
-        showError(error instanceof Error ? error.message : 'Failed to add record. Please try again.');
+        // Try to parse error response if it's a JSON parse error
+        if (error instanceof Error && error.message.includes('JSON')) {
+          showError('Failed to add record. This record may already exist.');
+        } else {
+          showError(error instanceof Error ? error.message : 'Failed to add record. Please try again.');
+        }
       }
     } finally {
       setIsSubmitting(false);
@@ -201,6 +253,7 @@ export default function MessScreen() {
 
   const renderRecord = ({ item }: { item: MessRecord }) => {
     const mealEmoji = mealTypes.find(m => m.value === item.mealType)?.emoji || '🍽️';
+    const personCountValue = item.personCount || 1;
     
     return (
       <View style={styles.recordCard}>
@@ -214,9 +267,16 @@ export default function MessScreen() {
           </TouchableOpacity>
         </View>
         <View style={styles.recordDetails}>
-          <Text style={styles.recordMeal}>
-            {mealEmoji} {item.mealType}
-          </Text>
+          <View>
+            <Text style={styles.recordMeal}>
+              {mealEmoji} {item.mealType}
+            </Text>
+            {personCountValue > 1 && (
+              <Text style={styles.recordPersonCount}>
+                👥 {personCountValue} Persons
+              </Text>
+            )}
+          </View>
           <Text style={styles.recordPrice}>{formatPrice(item.price)}</Text>
         </View>
       </View>
@@ -305,81 +365,197 @@ export default function MessScreen() {
           </View>
         </View>
 
-        {/* Add Record Form */}
-        <View style={styles.formCard}>
-          <Text style={styles.formTitle}>Add New Record</Text>
-          
-          {/* Date Input */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>📅 Date</Text>
-            <TouchableOpacity
-              style={styles.dateInput}
-              onPress={() => setShowDatePicker(true)}
-            >
-              <Text style={styles.dateInputText}>
-                {selectedDate.toLocaleDateString('en-US', {
-                  weekday: 'short',
-                  year: 'numeric',
-                  month: 'short',
-                  day: 'numeric',
-                })}
-              </Text>
-              <Text style={styles.dateInputIcon}>📅</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Meal Type Selector */}
-          {renderMealTypeSelector()}
-
-          {/* Price Input */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>💰 Price</Text>
-            <TextInput
-              style={styles.input}
-              value={price}
-              onChangeText={setPrice}
-              placeholder="Enter meal price"
-              placeholderTextColor="#999"
-              keyboardType="numeric"
-            />
-          </View>
-
-          {/* Add Button */}
-          <TouchableOpacity
-            style={[styles.addButton, isSubmitting && styles.buttonDisabled]}
-            onPress={handleAddRecord}
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <Text style={styles.addButtonText}>Add Record</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-
         {/* Records List */}
         <View style={styles.recordsSection}>
-          <Text style={styles.recordsTitle}>Recent Records</Text>
+          {/* <Text style={styles.recordsTitle}>Recent Records</Text> */}
+          
+          {/* Year and Month Filter Dropdown */}
+          {records.length > 0 && (() => {
+            // Get unique years from records data
+            const uniqueYears = [...new Set(records.map(r => new Date(r.date).getFullYear()))].sort((a, b) => b - a);
+            
+            // Get unique months for selected year
+            const recordsForYear = records.filter(r => new Date(r.date).getFullYear() === selectedYear);
+            const uniqueMonths = [...new Set(recordsForYear.map(r => new Date(r.date).getMonth() + 1))].sort((a, b) => b - a);
+            
+            // Filter records by selected year and month
+            const filteredRecords = records.filter(r => {
+              const recordDate = new Date(r.date);
+              return recordDate.getFullYear() === selectedYear && recordDate.getMonth() + 1 === selectedMonth;
+            });
+            
+            return (
+              <>
+                <View style={styles.filterContainer}>
+                  {/* <Text style={styles.yearFilterLabel}>Filter:</Text> */}
+                  <View style={styles.filterRow}>
+                    {/* Year Filter */}
+                    <View style={styles.filterItem}>
+                      <Text style={styles.filterItemLabel}>Year</Text>
+                      <TouchableOpacity
+                        style={styles.yearDropdown}
+                        onPress={() => setShowYearDropdown(true)}
+                      >
+                        <Text style={styles.yearDropdownText}>{selectedYear}</Text>
+                        <Text style={styles.yearDropdownArrow}>▼</Text>
+                      </TouchableOpacity>
+                      
+                      {/* Year Dropdown Modal */}
+                      <Modal
+                        visible={showYearDropdown}
+                        transparent={true}
+                        animationType="fade"
+                        onRequestClose={() => setShowYearDropdown(false)}
+                      >
+                        <TouchableOpacity
+                          style={styles.modalOverlay}
+                          activeOpacity={1}
+                          onPress={() => setShowYearDropdown(false)}
+                        >
+                          <View style={styles.dropdownContainer} onStartShouldSetResponder={() => true}>
+                            <View style={styles.dropdownHeader}>
+                              <Text style={styles.dropdownTitle}>Select Year</Text>
+                              <TouchableOpacity onPress={() => setShowYearDropdown(false)}>
+                                <Text style={styles.dropdownClose}>✕</Text>
+                              </TouchableOpacity>
+                            </View>
+                            <ScrollView style={styles.dropdownScroll}>
+                              {uniqueYears.map((year) => (
+                                <TouchableOpacity
+                                  key={year}
+                                  style={[
+                                    styles.dropdownItem,
+                                    selectedYear === year && styles.dropdownItemSelected
+                                  ]}
+                                  onPress={() => {
+                                    setSelectedYear(year);
+                                    // Reset month if it doesn't exist in new year
+                                    const yearRecords = records.filter(r => new Date(r.date).getFullYear() === year);
+                                    const yearMonths = [...new Set(yearRecords.map(r => new Date(r.date).getMonth() + 1))].sort((a, b) => b - a);
+                                    if (yearMonths.length > 0 && !yearMonths.includes(selectedMonth)) {
+                                      setSelectedMonth(yearMonths[0]);
+                                    }
+                                    setShowYearDropdown(false);
+                                  }}
+                                >
+                                  <Text style={[
+                                    styles.dropdownItemText,
+                                    selectedYear === year && styles.dropdownItemTextSelected
+                                  ]}>
+                                    {year}
+                                  </Text>
+                                  {selectedYear === year && (
+                                    <Text style={styles.dropdownItemCheck}>✓</Text>
+                                  )}
+                                </TouchableOpacity>
+                              ))}
+                            </ScrollView>
+                          </View>
+                        </TouchableOpacity>
+                      </Modal>
+                    </View>
+
+                    {/* Month Filter */}
+                    {uniqueMonths.length > 0 && (
+                      <View style={[styles.filterItem, { marginRight: 0 }]}>
+                        <Text style={styles.filterItemLabel}>Month</Text>
+                        <TouchableOpacity
+                          style={styles.yearDropdown}
+                          onPress={() => setShowMonthDropdown(true)}
+                        >
+                          <Text style={styles.yearDropdownText}>{monthNames[selectedMonth - 1]}</Text>
+                          <Text style={styles.yearDropdownArrow}>▼</Text>
+                        </TouchableOpacity>
+                        
+                        {/* Month Dropdown Modal */}
+                        <Modal
+                          visible={showMonthDropdown}
+                          transparent={true}
+                          animationType="fade"
+                          onRequestClose={() => setShowMonthDropdown(false)}
+                        >
+                          <TouchableOpacity
+                            style={styles.modalOverlay}
+                            activeOpacity={1}
+                            onPress={() => setShowMonthDropdown(false)}
+                          >
+                            <View style={styles.dropdownContainer} onStartShouldSetResponder={() => true}>
+                              <View style={styles.dropdownHeader}>
+                                <Text style={styles.dropdownTitle}>Select Month</Text>
+                                <TouchableOpacity onPress={() => setShowMonthDropdown(false)}>
+                                  <Text style={styles.dropdownClose}>✕</Text>
+                                </TouchableOpacity>
+                              </View>
+                              <ScrollView style={styles.dropdownScroll}>
+                                {uniqueMonths.map((month) => (
+                                  <TouchableOpacity
+                                    key={month}
+                                    style={[
+                                      styles.dropdownItem,
+                                      selectedMonth === month && styles.dropdownItemSelected
+                                    ]}
+                                    onPress={() => {
+                                      setSelectedMonth(month);
+                                      setShowMonthDropdown(false);
+                                    }}
+                                  >
+                                    <Text style={[
+                                      styles.dropdownItemText,
+                                      selectedMonth === month && styles.dropdownItemTextSelected
+                                    ]}>
+                                      {monthNames[month - 1]}
+                                    </Text>
+                                    {selectedMonth === month && (
+                                      <Text style={styles.dropdownItemCheck}>✓</Text>
+                                    )}
+                                  </TouchableOpacity>
+                                ))}
+                              </ScrollView>
+                            </View>
+                          </TouchableOpacity>
+                        </Modal>
+                      </View>
+                    )}
+                  </View>
+                </View>
+
           {isLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#20B2AA" />
               <Text style={styles.loadingText}>Loading records...</Text>
             </View>
-          ) : records.length === 0 ? (
+                ) : filteredRecords.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyEmoji}>🍽️</Text>
-              <Text style={styles.emptyText}>No records found</Text>
+                    <Text style={styles.emptyText}>No records found for {monthNames[selectedMonth - 1]} {selectedYear}</Text>
               <Text style={styles.emptySubtext}>Add your first meal record above</Text>
             </View>
           ) : (
             <FlatList
-              data={records}
+                    data={filteredRecords}
               renderItem={renderRecord}
               keyExtractor={(item) => item.id}
               showsVerticalScrollIndicator={false}
               scrollEnabled={false}
             />
+          )}
+              </>
+            );
+          })()}
+          
+          {records.length === 0 && !isLoading && (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyEmoji}>🍽️</Text>
+              <Text style={styles.emptyText}>No records found</Text>
+              <Text style={styles.emptySubtext}>Add your first meal record above</Text>
+            </View>
+          )}
+          
+          {isLoading && records.length === 0 && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#20B2AA" />
+              <Text style={styles.loadingText}>Loading records...</Text>
+            </View>
           )}
         </View>
 
@@ -500,7 +676,177 @@ export default function MessScreen() {
           </View>
         </Modal>
       </ScrollView>
+
+      {/* Floating Add Button */}
+      <TouchableOpacity
+        style={styles.floatingAddButton}
+        onPress={() => setShowAddModal(true)}
+      >
+        <Text style={styles.floatingAddButtonText}>+ Add Record</Text>
+      </TouchableOpacity>
+
+      {/* Add Record Modal */}
+      {showAddModal && (
+        <AddRecordModal
+          selectedDate={selectedDate}
+          setSelectedDate={setSelectedDate}
+          mealType={mealType}
+          setMealType={setMealType}
+          price={price}
+          setPrice={setPrice}
+          personCount={personCount}
+          setPersonCount={setPersonCount}
+          showDatePicker={showDatePicker}
+          setShowDatePicker={setShowDatePicker}
+          isSubmitting={isSubmitting}
+          onClose={() => setShowAddModal(false)}
+          onSubmit={handleAddRecord}
+        />
+      )}
     </KeyboardAvoidingView>
+  );
+}
+
+// Add Record Modal Component
+function AddRecordModal({
+  selectedDate,
+  setSelectedDate,
+  mealType,
+  setMealType,
+  price,
+  setPrice,
+  personCount,
+  setPersonCount,
+  showDatePicker,
+  setShowDatePicker,
+  isSubmitting,
+  onClose,
+  onSubmit,
+}: {
+  selectedDate: Date;
+  setSelectedDate: (date: Date) => void;
+  mealType: 'Breakfast' | 'Lunch' | 'Dinner';
+  setMealType: (type: 'Breakfast' | 'Lunch' | 'Dinner') => void;
+  price: string;
+  setPrice: (price: string) => void;
+  personCount: string;
+  setPersonCount: (count: string) => void;
+  showDatePicker: boolean;
+  setShowDatePicker: (show: boolean) => void;
+  isSubmitting: boolean;
+  onClose: () => void;
+  onSubmit: () => void;
+}) {
+  const mealTypes = [
+    { value: 'Breakfast' as const, label: 'Breakfast', emoji: '🌅' },
+    { value: 'Lunch' as const, label: 'Lunch', emoji: '☀️' },
+    { value: 'Dinner' as const, label: 'Dinner', emoji: '🌙' },
+  ];
+
+  return (
+    <Modal visible={true} transparent={true} animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.modalOverlayCompact}
+      >
+        <View style={styles.modalContainerCompact}>
+          <View style={styles.modalHeaderCompact}>
+            <Text style={styles.modalTitleCompact}>Add Record</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Text style={styles.modalCloseButton}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView 
+            style={styles.modalContentCompact}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Date Input */}
+            <View style={styles.inputContainerCompact}>
+              <Text style={styles.labelCompact}>📅 Date</Text>
+              <TouchableOpacity
+                style={styles.dateInputCompact}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Text style={styles.dateInputTextCompact}>
+                  {selectedDate.toLocaleDateString('en-US', {
+                    weekday: 'short',
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                </Text>
+                <Text style={styles.dateInputIconCompact}>📅</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Meal Type Selector */}
+            <View style={styles.inputContainerCompact}>
+              <Text style={styles.labelCompact}>Meal Type *</Text>
+              <View style={styles.mealTypeButtonsCompact}>
+                {mealTypes.map((type) => (
+                  <TouchableOpacity
+                    key={type.value}
+                    style={[
+                      styles.mealTypeButtonCompact,
+                      mealType === type.value && styles.mealTypeButtonActiveCompact
+                    ]}
+                    onPress={() => setMealType(type.value)}
+                  >
+                    <Text style={[
+                      styles.mealTypeButtonTextCompact,
+                      mealType === type.value && styles.mealTypeButtonTextActiveCompact
+                    ]}>
+                      {type.emoji} {type.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Price Input */}
+            <View style={styles.inputContainerCompact}>
+              <Text style={styles.labelCompact}>💰 Price (per person) *</Text>
+              <TextInput
+                style={styles.inputCompact}
+                value={price}
+                onChangeText={setPrice}
+                placeholder="Enter meal price per person"
+                placeholderTextColor="#999"
+                keyboardType="numeric"
+              />
+            </View>
+
+            {/* Person Count Input */}
+            <View style={styles.inputContainerCompact}>
+              <Text style={styles.labelCompact}>👥 Person</Text>
+              <TextInput
+                style={styles.inputCompact}
+                value={personCount}
+                onChangeText={setPersonCount}
+                placeholder="Enter number of persons (default: 1)"
+                placeholderTextColor="#999"
+                keyboardType="numeric"
+              />
+            </View>
+
+            {/* Submit Button */}
+            <TouchableOpacity
+              style={[styles.submitButtonCompact, isSubmitting && styles.submitButtonDisabled]}
+              onPress={onSubmit}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text style={styles.submitButtonTextCompact}>Add Record</Text>
+              )}
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }
 
@@ -707,6 +1053,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#7f8c8d',
   },
+  recordPersonCount: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 4,
+  },
   loadingContainer: {
     alignItems: 'center',
     paddingVertical: 40,
@@ -824,6 +1175,245 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   modalConfirmText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  // Year and Month Filter Styles
+  filterContainer: {
+    marginBottom: 15,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  yearFilterLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: 10,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  filterItem: {
+    flex: 1,
+    marginRight: 8,
+  },
+  filterItemLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#7f8c8d',
+    marginBottom: 8,
+    marginTop: 8,
+  },
+  yearDropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  yearDropdownText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#2c3e50',
+  },
+  yearDropdownArrow: {
+    fontSize: 12,
+    color: '#7f8c8d',
+    marginLeft: 8,
+  },
+  dropdownContainer: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    width: '80%',
+    maxHeight: '60%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  dropdownHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  dropdownTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+  },
+  dropdownClose: {
+    fontSize: 20,
+    color: '#7f8c8d',
+    fontWeight: 'bold',
+  },
+  dropdownScroll: {
+    maxHeight: 300,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  dropdownItemSelected: {
+    backgroundColor: '#f0f9ff',
+  },
+  dropdownItemText: {
+    fontSize: 16,
+    color: '#2c3e50',
+  },
+  dropdownItemTextSelected: {
+    color: '#20B2AA',
+    fontWeight: '600',
+  },
+  dropdownItemCheck: {
+    fontSize: 18,
+    color: '#20B2AA',
+    fontWeight: 'bold',
+  },
+  // Floating Add Button
+  floatingAddButton: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    backgroundColor: '#20B2AA',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderRadius: 25,
+    shadowColor: '#20B2AA',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+    zIndex: 10,
+  },
+  floatingAddButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  // Compact Modal Styles
+  modalOverlayCompact: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContainerCompact: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '90%',
+    paddingBottom: 20,
+  },
+  modalHeaderCompact: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  modalTitleCompact: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+  },
+  modalCloseButton: {
+    fontSize: 24,
+    color: '#666',
+    fontWeight: 'bold',
+  },
+  modalContentCompact: {
+    padding: 18,
+  },
+  inputContainerCompact: {
+    marginBottom: 18,
+  },
+  labelCompact: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: 8,
+  },
+  inputCompact: {
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: '#2c3e50',
+  },
+  dateInputCompact: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    padding: 12,
+  },
+  dateInputTextCompact: {
+    fontSize: 16,
+    color: '#2c3e50',
+  },
+  dateInputIconCompact: {
+    fontSize: 18,
+  },
+  mealTypeButtonsCompact: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  mealTypeButtonCompact: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 8,
+    backgroundColor: '#f8f9fa',
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
+    alignItems: 'center',
+  },
+  mealTypeButtonActiveCompact: {
+    borderColor: '#20B2AA',
+    backgroundColor: '#f0fdfa',
+  },
+  mealTypeButtonTextCompact: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#666',
+  },
+  mealTypeButtonTextActiveCompact: {
+    color: '#20B2AA',
+  },
+  submitButtonCompact: {
+    backgroundColor: '#20B2AA',
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#95a5a6',
+  },
+  submitButtonTextCompact: {
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',

@@ -225,6 +225,9 @@ router.post('/', [
     }
 
     // Send notifications for group transaction (async, don't wait for it)
+    // Only send emails to contacts explicitly in the contactIds array
+    console.log('=== SENDING GROUP TRANSACTION NOTIFICATIONS ===');
+    console.log('Only sending to these contact IDs:', contactIds);
     createGroupTransactionNotification(groupTransaction, userId, contactIds)
       .then(result => {
         console.log('Group notification result:', result);
@@ -278,20 +281,43 @@ router.get('/', authenticateToken, async (req, res) => {
       .sort({ createdAt: -1 });
 
     // Transform the data to match frontend expectations
-    const transformedTransactions = groupTransactions.map(transaction => ({
-      id: transaction._id,
-      payerId: transaction.payerId || 'USER',
-      payerName: transaction.payerId ? transaction.payerId.name : 'You',
-      contactIds: transaction.contactIds,
-      contactNames: transaction.contactIds.map(contact => contact.name),
-      totalAmount: transaction.totalAmount,
-      perPersonShare: transaction.perPersonShare,
-      description: transaction.description,
-      createdAt: transaction.createdAt,
-      splitMode: transaction.splitMode || 'equal',
-      individualAmounts: transaction.individualAmounts ? Object.fromEntries(transaction.individualAmounts) : undefined,
-      userAmount: transaction.userAmount || undefined
-    }));
+    const transformedTransactions = groupTransactions.map(transaction => {
+      // Convert contactIds to string format for consistent matching
+      const contactIdsAsStrings = transaction.contactIds.map(c => 
+        typeof c === 'object' && c._id ? c._id.toString() : c.toString()
+      );
+      
+      // Convert individualAmounts Map to object with string keys
+      let individualAmountsObj = undefined;
+      if (transaction.individualAmounts && transaction.individualAmounts instanceof Map) {
+        individualAmountsObj = {};
+        transaction.individualAmounts.forEach((value, key) => {
+          // Ensure key is a string
+          individualAmountsObj[key.toString()] = value;
+        });
+      } else if (transaction.individualAmounts) {
+        // Already an object, but ensure keys are strings
+        individualAmountsObj = {};
+        Object.entries(transaction.individualAmounts).forEach(([key, value]) => {
+          individualAmountsObj[key.toString()] = value;
+        });
+      }
+      
+      return {
+        id: transaction._id,
+        payerId: transaction.payerId || 'USER',
+        payerName: transaction.payerId ? transaction.payerId.name : 'You',
+        contactIds: contactIdsAsStrings,
+        contactNames: transaction.contactIds.map(contact => contact.name),
+        totalAmount: transaction.totalAmount,
+        perPersonShare: transaction.perPersonShare,
+        description: transaction.description,
+        createdAt: transaction.createdAt,
+        splitMode: transaction.splitMode || 'equal',
+        individualAmounts: individualAmountsObj,
+        userAmount: transaction.userAmount || undefined
+      };
+    });
 
     res.json({
       success: true,

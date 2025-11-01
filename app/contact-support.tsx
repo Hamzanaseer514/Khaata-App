@@ -40,7 +40,7 @@ export default function ContactSupportScreen() {
   };
 
   const handleEmail = () => {
-    const email = 'ameerhamzauet1026@gmail.com';
+    const email = 'khaataapp.co@gmail.com';
     const subject = 'Khaata App - Support Request';
     const body = message || 'Hello,\n\nI need assistance with the following:\n\n';
     const url = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -120,7 +120,7 @@ export default function ContactSupportScreen() {
             </View>
             <View style={styles.contactInfo}>
               <Text style={styles.contactTitle}>Email</Text>
-              <Text style={styles.contactSubtitle}>ameerhamzauet1026@gmail.com</Text>
+              <Text style={styles.contactSubtitle}>khaataapp.co@gmail.com</Text>
               <Text style={styles.contactDescription}>Detailed support, best for complex issues</Text>
             </View>
           </TouchableOpacity>

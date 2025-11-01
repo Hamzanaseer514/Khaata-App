@@ -26,6 +26,7 @@ app.use('/api/group-transactions', require('./routes/group-transactions'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/mess', require('./routes/messRoutes'));
+app.use('/api/personal-transactions', require('./routes/personal-transactions'));
 
 // Basic route
 app.get('/', (req, res) => {

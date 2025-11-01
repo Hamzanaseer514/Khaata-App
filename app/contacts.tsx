@@ -31,6 +31,13 @@ export default function ContactsListScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showEdit, setShowEdit] = useState(false);
+  const [editContactId, setEditContactId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     fetchContacts();
@@ -96,6 +103,59 @@ export default function ContactsListScreen() {
     router.push(`/contact-detail?contactId=${contactId}`);
   };
 
+  const openEdit = (c: Contact) => {
+    setEditContactId(c._id || c.id || '');
+    setEditName(c.name);
+    setEditEmail(c.email || '');
+    setEditPhone(c.phone);
+    setShowEdit(true);
+  };
+
+  const submitEdit = async () => {
+    if (!editContactId) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${config.BASE_URL}/contacts/${editContactId}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editName, email: editEmail, phone: editPhone })
+      });
+      const data = await res.json();
+      if (!data.success) {
+        showError(data.message || 'Failed to update contact');
+      } else {
+        setShowEdit(false);
+        fetchContacts(true);
+      }
+    } catch (e) {
+      showError('Failed to update contact');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!confirmDeleteId) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${config.BASE_URL}/contacts/${confirmDeleteId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!data.success) {
+        showError(data.message || 'Failed to delete contact');
+      } else {
+        setConfirmDeleteId(null);
+        fetchContacts(true);
+      }
+    } catch (e) {
+      showError('Failed to delete contact');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // Search functionality
   useEffect(() => {
     if (searchQuery.trim() === '') {
@@ -119,27 +179,18 @@ export default function ContactsListScreen() {
   };
 
   const renderContact = ({ item }: { item: Contact }) => (
-    <TouchableOpacity
-      style={styles.contactCard}
-      onPress={() => handleContactPress(item)}
-    >
+    <View style={styles.contactCard}>
+      <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }} onPress={() => handleContactPress(item)}>
       <View style={styles.contactAvatar}>
-        <Text style={styles.avatarText}>
-          {item.name.charAt(0).toUpperCase()}
-        </Text>
+          <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
       </View>
       <View style={styles.contactInfo}>
         <Text style={styles.contactName}>{item.name}</Text>
         <Text style={styles.contactPhone}>{item.phone}</Text>
-        {item.email && (
-          <Text style={styles.contactEmail}>{item.email}</Text>
-        )}
+          {item.email && (<Text style={styles.contactEmail}>{item.email}</Text>)}
       </View>
       <View style={styles.contactBalance}>
-        <Text style={[
-          styles.balanceAmount,
-          { color: item.balance > 0 ? '#27ae60' : item.balance < 0 ? '#e74c3c' : '#7f8c8d' }
-        ]}>
+          <Text style={[styles.balanceAmount, { color: item.balance > 0 ? '#27ae60' : item.balance < 0 ? '#e74c3c' : '#7f8c8d' }]}>
           ₹{Math.abs(item.balance).toFixed(2)}
         </Text>
         <Text style={styles.balanceLabel}>
@@ -147,6 +198,15 @@ export default function ContactsListScreen() {
         </Text>
       </View>
     </TouchableOpacity>
+      <View style={styles.rowActions}>
+        <TouchableOpacity style={[styles.iconBtn, styles.iconEdit]} onPress={() => openEdit(item)}>
+          <Text style={[styles.iconText, styles.iconEditText]}>✎</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.iconBtn, styles.iconDelete]} onPress={() => setConfirmDeleteId(item._id || item.id || '')}>
+          <Text style={[styles.iconText, styles.iconDeleteText]}>🗑️</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 
   const renderEmptyState = () => (
@@ -234,6 +294,36 @@ export default function ContactsListScreen() {
           }
         />
       )}
+
+      {/* Edit Modal */}
+      {showEdit && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.editModal}>
+            <Text style={styles.modalTitle}>Edit Contact</Text>
+            <View style={styles.inputContainer}><Text style={styles.label}>Name</Text><TextInput style={styles.input} value={editName} onChangeText={setEditName} /></View>
+            <View style={styles.inputContainer}><Text style={styles.label}>Email</Text><TextInput style={styles.input} value={editEmail} onChangeText={setEditEmail} autoCapitalize="none" keyboardType="email-address" /></View>
+            <View style={styles.inputContainer}><Text style={styles.label}>Phone</Text><TextInput style={styles.input} value={editPhone} onChangeText={setEditPhone} keyboardType="phone-pad" /></View>
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowEdit(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.saveBtn, submitting && { opacity: 0.6 }]} onPress={submitEdit} disabled={submitting}><Text style={styles.saveText}>{submitting ? 'Saving…' : 'Save'}</Text></TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Delete Confirm */}
+      {confirmDeleteId && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.confirmModal}>
+            <Text style={styles.modalTitle}>Delete contact?</Text>
+            <Text style={styles.confirmText}>This will also delete related records.</Text>
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setConfirmDeleteId(null)}><Text style={styles.cancelText}>No</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.deleteBtn, submitting && { opacity: 0.6 }]} onPress={confirmDelete} disabled={submitting}><Text style={styles.deleteText}>{submitting ? 'Deleting…' : 'Yes, delete'}</Text></TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -306,6 +396,13 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  rowActions: { flexDirection: 'column', gap: 6, marginLeft: 8, alignItems: 'center', justifyContent: 'center' },
+  iconBtn: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  iconEdit: { backgroundColor: '#e0f2fe' },
+  iconEditText: { color: '#0369a1' },
+  iconDelete: { backgroundColor: '#fee2e2' },
+  iconDeleteText: { color: '#b91c1c' },
+  iconText: { fontSize: 14 },
   contactAvatar: {
     width: 50,
     height: 50,
@@ -423,4 +520,19 @@ const styles = StyleSheet.create({
     color: '#7f8c8d',
     fontWeight: 'bold',
   },
+  inputContainer: { marginBottom: 14 },
+  label: { fontSize: 13, color: '#374151', marginBottom: 6, fontWeight: '600' },
+  input: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, backgroundColor: '#fff', color: '#1f2937' },
+  modalOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  editModal: { width: '90%', backgroundColor: '#fff', borderRadius: 14, padding: 16 },
+  confirmModal: { width: '85%', backgroundColor: '#fff', borderRadius: 14, padding: 16 },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 8 },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 8 },
+  cancelBtn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, backgroundColor: '#f3f4f6' },
+  cancelText: { color: '#374151', fontWeight: '700' },
+  saveBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, backgroundColor: '#20B2AA' },
+  saveText: { color: '#fff', fontWeight: '800' },
+  deleteBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, backgroundColor: '#ef4444' },
+  deleteText: { color: '#fff', fontWeight: '800' },
+  confirmText: { color: '#6b7280', marginTop: 4 },
 });

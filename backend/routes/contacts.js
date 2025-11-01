@@ -2,6 +2,8 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const Contact = require('../models/Contact');
+const Transaction = require('../models/Transaction');
+const GroupTransaction = require('../models/GroupTransaction');
 
 const router = express.Router();
 
@@ -200,16 +202,22 @@ router.put('/:id', [
     .isLength({ min: 2, max: 50 })
     .withMessage('Name must be between 2 and 50 characters'),
   body('email')
-    .optional()
-    .isEmail()
+    .optional({ nullable: true, checkFalsy: true })
     .normalizeEmail()
-    .withMessage('Please provide a valid email'),
+    .custom((value) => {
+      if (!value || value === '') return true; // Allow empty email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(value)) {
+        throw new Error('Please provide a valid email');
+      }
+      return true;
+    }),
   body('phone')
     .optional()
     .trim()
     .isLength({ min: 10, max: 15 })
     .withMessage('Phone number must be between 10 and 15 digits')
-    .matches(/^[\+]?[1-9][\d]{0,15}$/)
+    .matches(/^[\+]?[0-9][\d]{9,14}$/)
     .withMessage('Please enter a valid phone number')
 ], async (req, res) => {
   try {
@@ -237,9 +245,9 @@ router.put('/:id', [
 
     // Update contact fields
     const { name, email, phone } = req.body;
-    if (name) contact.name = name;
-    if (email !== undefined) contact.email = email;
-    if (phone) contact.phone = phone;
+    if (name && name.trim()) contact.name = name.trim();
+    if (email !== undefined) contact.email = email === '' ? undefined : email;
+    if (phone && phone.trim()) contact.phone = phone.trim();
 
     await contact.save();
 
@@ -269,10 +277,7 @@ router.put('/:id', [
 // DELETE /api/contacts/:id - Delete a contact
 router.delete('/:id', authenticateToken, async (req, res) => {
   try {
-    const contact = await Contact.findOneAndDelete({ 
-      _id: req.params.id, 
-      userId: req.user.userId 
-    });
+    const contact = await Contact.findOne({ _id: req.params.id, userId: req.user.userId });
 
     if (!contact) {
       return res.status(404).json({
@@ -281,10 +286,19 @@ router.delete('/:id', authenticateToken, async (req, res) => {
       });
     }
 
-    res.json({
-      success: true,
-      message: 'Contact deleted successfully'
+    // Delete contact
+    await Contact.deleteOne({ _id: contact._id });
+
+    // Cascade delete: remove all single transactions for this contact
+    await Transaction.deleteMany({ userId: req.user.userId, contactId: contact._id });
+
+    // Cascade delete: remove all group transactions where this contact is payer or participant
+    await GroupTransaction.deleteMany({
+      userId: req.user.userId,
+      $or: [{ payerId: contact._id }, { contactIds: contact._id }]
     });
+
+    res.json({ success: true, message: 'Contact and related records deleted' });
 
   } catch (error) {
     console.error('Delete contact error:', error);

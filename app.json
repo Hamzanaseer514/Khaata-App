@@ -10,10 +10,10 @@
     "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.khaata.app"   
+      "bundleIdentifier": "com.khaata.app"
     },
     "android": {
-      "package": "com.khaata.app",   
+      "package": "com.khaata.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -45,6 +45,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "d0dec0a4-1a8e-4bb3-9f1e-77259fdbbaf1"
+      }
     }
   }
 }

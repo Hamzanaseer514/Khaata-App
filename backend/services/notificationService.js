@@ -91,7 +91,13 @@ const createGroupTransactionNotification = async (groupTransaction, userId, cont
     console.log('=== CREATING GROUP TRANSACTION NOTIFICATIONS ===');
     console.log('Group Transaction:', groupTransaction);
     console.log('User ID:', userId);
-    console.log('Contact IDs:', contactIds);
+    console.log('Contact IDs (only these will receive emails):', contactIds);
+    
+    // Validate that contactIds is an array and not empty
+    if (!Array.isArray(contactIds) || contactIds.length === 0) {
+      console.log('No contact IDs provided for group transaction notifications');
+      return { success: false, error: 'No contact IDs provided' };
+    }
     
     const results = [];
     
@@ -102,11 +108,29 @@ const createGroupTransactionNotification = async (groupTransaction, userId, cont
       return { success: false, error: 'User not found' };
     }
     
-    // Calculate per person share
-    const perPersonShare = groupTransaction.perPersonShare;
     const isUserPayer = groupTransaction.payerId === null;
+    const splitMode = groupTransaction.splitMode || 'equal';
     
-    for (const contactId of contactIds) {
+    // Convert individualAmounts Map to object if needed
+    let individualAmountsObj = {};
+    if (groupTransaction.individualAmounts) {
+      if (groupTransaction.individualAmounts instanceof Map) {
+        groupTransaction.individualAmounts.forEach((value, key) => {
+          individualAmountsObj[key.toString()] = value;
+        });
+      } else {
+        // Already an object
+        Object.entries(groupTransaction.individualAmounts).forEach(([key, value]) => {
+          individualAmountsObj[key.toString()] = value;
+        });
+      }
+    }
+    
+    // Only process contacts that are explicitly in the contactIds array
+    const uniqueContactIds = [...new Set(contactIds)]; // Remove duplicates
+    console.log(`Sending emails to ${uniqueContactIds.length} contact(s) only`);
+    
+    for (const contactId of uniqueContactIds) {
       try {
         // Find the contact
         const contact = await Contact.findOne({ _id: contactId, userId });
@@ -131,6 +155,17 @@ const createGroupTransactionNotification = async (groupTransaction, userId, cont
           continue;
         }
         
+        // Get the correct amount for this contact
+        const contactIdStr = contactId.toString();
+        let contactAmount = groupTransaction.perPersonShare; // Default to equal share
+        
+        if (splitMode === 'manual' && individualAmountsObj[contactIdStr] !== undefined) {
+          contactAmount = individualAmountsObj[contactIdStr];
+          console.log(`Using manual amount for ${contact.name}: ₹${contactAmount}`);
+        } else {
+          console.log(`Using equal share for ${contact.name}: ₹${contactAmount}`);
+        }
+        
         // Create notification record
         const notification = new Notification({
           transactionId: null, // Group transactions don't have a single transaction ID
@@ -146,7 +181,7 @@ const createGroupTransactionNotification = async (groupTransaction, userId, cont
         // Prepare email data for group transaction
         const emailData = {
           type: isUserPayer ? 'DEBIT' : 'CREDIT', // If user paid, contact owes (DEBIT for contact)
-          amount: perPersonShare,
+          amount: contactAmount, // Use individual amount for manual split
           contactName: contact.name,
           userName: user.name,
           updatedBalance: contact.balance,

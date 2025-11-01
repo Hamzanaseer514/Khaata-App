@@ -3,12 +3,12 @@ import { showError } from '@/utils/toast';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import config from '../../config/config';
 
@@ -161,10 +161,13 @@ export default function GroupTransactionDetailScreen() {
           <Text style={styles.cardTitle}>Group Members</Text>
           <View style={styles.membersList}>
             {transaction.contactNames.map((name, index) => {
-              const contactId = transaction.contactIds[index];
-              const individualAmount = transaction.splitMode === 'manual' && transaction.individualAmounts 
-                ? transaction.individualAmounts[contactId] 
-                : transaction.perPersonShare;
+              const contactId = transaction.contactIds[index]?.toString() || transaction.contactIds[index];
+              
+              // Get individual amount - use manual amount if available, otherwise use perPersonShare
+              let individualAmount = transaction.perPersonShare;
+              if (transaction.splitMode === 'manual' && transaction.individualAmounts && contactId) {
+                individualAmount = transaction.individualAmounts[contactId] || transaction.perPersonShare;
+              }
               
               return (
                 <View key={index} style={styles.memberItem}>
@@ -175,10 +178,9 @@ export default function GroupTransactionDetailScreen() {
                   </View>
                   <View style={styles.memberInfo}>
                     <Text style={styles.memberName}>{name}</Text>
-                    <Text style={styles.memberShare}>Owes ₹{individualAmount}</Text>
                   </View>
-                  <View style={styles.memberStatus}>
-                    <Text style={styles.memberStatusText}>Pending</Text>
+                  <View style={styles.memberAmount}>
+                    <Text style={styles.memberAmountText}>₹{(individualAmount || 0).toFixed(2)}</Text>
                   </View>
                 </View>
               );
@@ -192,10 +194,9 @@ export default function GroupTransactionDetailScreen() {
                 </View>
                 <View style={styles.memberInfo}>
                   <Text style={styles.memberName}>You</Text>
-                  <Text style={styles.memberShare}>Your share: ₹{transaction.userAmount}</Text>
                 </View>
-                <View style={styles.memberStatus}>
-                  <Text style={styles.memberStatusText}>Paid</Text>
+                <View style={styles.memberAmount}>
+                  <Text style={styles.memberAmountText}>₹{(transaction.userAmount || 0).toFixed(2)}</Text>
                 </View>
               </View>
             )}
@@ -443,22 +444,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#2c3e50',
-    marginBottom: 2,
   },
-  memberShare: {
-    fontSize: 14,
-    color: '#7f8c8d',
+  memberAmount: {
+    alignItems: 'flex-end',
   },
-  memberStatus: {
-    backgroundColor: '#f39c12',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  memberStatusText: {
-    fontSize: 10,
-    color: 'white',
-    fontWeight: '600',
+  memberAmountText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#9b59b6',
   },
   summaryCard: {
     backgroundColor: 'white',

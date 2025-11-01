@@ -5,17 +5,18 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    FlatList,
-    KeyboardAvoidingView,
-    Platform,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import config from '../config/config';
 
@@ -45,6 +46,7 @@ export default function ContactDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showAddTransaction, setShowAddTransaction] = useState(false);
   const [exporting, setExporting] = useState(false);
+  // Edit/Delete are handled on the list screen only
 
   // Handle contactId parameter (can be string or array)
   const actualContactId = Array.isArray(contactId) ? contactId[0] : contactId;
@@ -355,6 +357,7 @@ export default function ContactDetailScreen() {
           onSuccess={handleTransactionAdded}
         />
       )}
+
     </View>
   );
 }
@@ -419,119 +422,106 @@ function AddTransactionModal({
   };
 
   return (
-    <View style={styles.modalOverlay}>
+    <Modal visible={true} transparent={true} animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView 
-        style={styles.modalContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        style={styles.modalOverlay}
       >
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Add Transaction</Text>
+        <View style={styles.modalContainerCompact}>
+          <View style={styles.modalHeaderCompact}>
+            <Text style={styles.modalTitleCompact}>Add Transaction</Text>
             <TouchableOpacity onPress={onClose}>
-              <Text style={styles.closeButton}>✕</Text>
+              <Text style={styles.modalCloseButton}>✕</Text>
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.contactNameText}>For: {contactName}</Text>
+          <Text style={styles.contactNameTextCompact}>For: {contactName}</Text>
 
           <ScrollView 
-            style={styles.formScrollView}
-            showsVerticalScrollIndicator={false}
+            style={styles.modalContentCompact}
             keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            <View style={styles.form}>
-              {/* Amount Field */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Amount *</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter amount"
-                  value={amount}
-                  onChangeText={setAmount}
-                  keyboardType="numeric"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </View>
-
-              {/* Transaction Type */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Transaction Type *</Text>
-                <View style={styles.typeButtons}>
-                  <TouchableOpacity
-                    style={[
-                      styles.typeButton,
-                      payer === 'USER' && styles.typeButtonActive
-                    ]}
-                    onPress={() => setPayer('USER')}
-                  >
-                    <Text style={[
-                      styles.typeButtonText,
-                      payer === 'USER' && styles.typeButtonTextActive
-                    ]}>
-                      💸 You Paid
-                    </Text>
-                    <Text style={[
-                      styles.typeButtonSubtext,
-                      payer === 'USER' && styles.typeButtonSubtextActive
-                    ]}>
-                      Friend owes you
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.typeButton,
-                      payer === 'FRIEND' && styles.typeButtonActive
-                    ]}
-                    onPress={() => setPayer('FRIEND')}
-                  >
-                    <Text style={[
-                      styles.typeButtonText,
-                      payer === 'FRIEND' && styles.typeButtonTextActive
-                    ]}>
-                      💰 Friend Paid
-                    </Text>
-                    <Text style={[
-                      styles.typeButtonSubtext,
-                      payer === 'FRIEND' && styles.typeButtonSubtextActive
-                    ]}>
-                      You owe friend
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Note Field */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Note (Optional)</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  placeholder="Enter transaction note"
-                  value={note}
-                  onChangeText={setNote}
-                  multiline
-                  numberOfLines={3}
-                  autoCapitalize="sentences"
-                  autoCorrect={true}
-                />
-              </View>
-
-              {/* Submit Button */}
-              <TouchableOpacity
-                style={[styles.submitButton, isLoading && styles.submitButtonDisabled]}
-                onPress={handleSubmit}
-                disabled={isLoading}
-              >
-                <Text style={styles.submitButtonText}>
-                  {isLoading ? 'Adding Transaction...' : 'Add Transaction'}
-                </Text>
-              </TouchableOpacity>
+            {/* Amount Field */}
+            <View style={styles.inputContainerCompact}>
+              <Text style={styles.labelCompact}>Amount *</Text>
+              <TextInput
+                style={styles.inputCompact}
+                placeholder="Enter amount"
+                value={amount}
+                onChangeText={setAmount}
+                keyboardType="numeric"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
             </View>
+
+            {/* Transaction Type */}
+            <View style={styles.inputContainerCompact}>
+              <Text style={styles.labelCompact}>Transaction Type *</Text>
+              <View style={styles.typeButtonsCompact}>
+                <TouchableOpacity
+                  style={[
+                    styles.typeButtonCompact,
+                    payer === 'USER' && styles.typeButtonActive
+                  ]}
+                  onPress={() => setPayer('USER')}
+                >
+                  <Text style={[
+                    styles.typeButtonTextCompact,
+                    payer === 'USER' && styles.typeButtonTextActive
+                  ]}>
+                    💸 You Paid
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.typeButtonCompact,
+                    payer === 'FRIEND' && styles.typeButtonActive
+                  ]}
+                  onPress={() => setPayer('FRIEND')}
+                >
+                  <Text style={[
+                    styles.typeButtonTextCompact,
+                    payer === 'FRIEND' && styles.typeButtonTextActive
+                  ]}>
+                    💰 Friend Paid
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Note Field */}
+            <View style={styles.inputContainerCompact}>
+              <Text style={styles.labelCompact}>Note (Optional)</Text>
+              <TextInput
+                style={[styles.inputCompact, styles.textAreaCompact]}
+                placeholder="Enter transaction note"
+                value={note}
+                onChangeText={setNote}
+                multiline
+                numberOfLines={2}
+                autoCapitalize="sentences"
+                autoCorrect={true}
+              />
+            </View>
+
+            {/* Submit Button */}
+            <TouchableOpacity
+              style={[styles.submitButtonCompact, isLoading && styles.submitButtonDisabled]}
+              onPress={handleSubmit}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text style={styles.submitButtonTextCompact}>Add Transaction</Text>
+              )}
+            </TouchableOpacity>
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
-    </View>
+    </Modal>
   );
 }
 
@@ -599,6 +589,28 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   addButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  editButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  editButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  deleteButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  deleteButtonText: {
     color: 'white',
     fontSize: 14,
     fontWeight: '600',
@@ -765,15 +777,9 @@ const styles = StyleSheet.create({
   },
   // Modal Styles
   modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
+    justifyContent: 'flex-end',
   },
   modalContainer: {
     width: '90%',
@@ -899,5 +905,94 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Compact Modal Styles
+  modalContainerCompact: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '90%',
+    paddingBottom: 20,
+  },
+  modalHeaderCompact: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  modalTitleCompact: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+  },
+  modalCloseButton: {
+    fontSize: 24,
+    color: '#666',
+    fontWeight: 'bold',
+  },
+  contactNameTextCompact: {
+    fontSize: 15,
+    color: '#7f8c8d',
+    marginBottom: 15,
+    paddingHorizontal: 18,
+    textAlign: 'center',
+    marginTop:10
+  },
+  modalContentCompact: {
+    padding: 18,
+  },
+  inputContainerCompact: {
+    marginBottom: 18,
+  },
+  labelCompact: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: 8,
+  },
+  inputCompact: {
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: '#2c3e50',
+  },
+  textAreaCompact: {
+    height: 70,
+    textAlignVertical: 'top',
+  },
+  typeButtonsCompact: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  typeButtonCompact: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 8,
+    backgroundColor: '#f8f9fa',
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
+    alignItems: 'center',
+  },
+  typeButtonTextCompact: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#666',
+  },
+  submitButtonCompact: {
+    backgroundColor: '#20B2AA',
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  submitButtonTextCompact: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

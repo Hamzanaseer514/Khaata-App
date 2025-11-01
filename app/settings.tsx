@@ -1,32 +1,41 @@
+import config from '@/config/config';
 import { useAuth } from '@/contexts/AuthContext';
+import {
+  getBiometricPreference,
+  isBiometricAvailable,
+  setBiometricPreference
+} from '@/utils/biometric';
 import { showError, showInfo, showSuccess } from '@/utils/toast';
+import * as FileSystem from 'expo-file-system/legacy';
 import { router } from 'expo-router';
+import * as Sharing from 'expo-sharing';
 import React, { useRef, useState } from 'react';
 import {
-    Animated,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Animated,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 export default function SettingsScreen() {
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
 
   // Settings states
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [pushNotifications, setPushNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const [currency, setCurrency] = useState('₹');
   const [language, setLanguage] = useState('English');
-  const [autoBackup, setAutoBackup] = useState(true);
   const [biometricAuth, setBiometricAuth] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
 
   React.useEffect(() => {
     Animated.parallel([
@@ -41,7 +50,53 @@ export default function SettingsScreen() {
         useNativeDriver: true,
       }),
     ]).start();
+
+    // Load biometric preference and availability
+    loadBiometricSettings();
   }, []);
+
+  const loadBiometricSettings = async () => {
+    try {
+      const [preference, available] = await Promise.all([
+        getBiometricPreference(),
+        isBiometricAvailable(),
+      ]);
+      setBiometricAuth(preference);
+      setBiometricAvailable(available);
+    } catch (error) {
+      console.error('Error loading biometric settings:', error);
+    }
+  };
+
+  const handleBiometricToggle = async (value: boolean) => {
+    try {
+      if (value) {
+        // Check if biometric is available before enabling
+        const available = await isBiometricAvailable();
+        if (!available) {
+          showError('Biometric authentication is not available on this device');
+          return;
+        }
+
+        // Test biometric authentication before enabling
+        const { authenticateWithBiometric } = await import('@/utils/biometric');
+        const result = await authenticateWithBiometric();
+        
+        if (!result.success) {
+          showError(result.error || 'Biometric authentication failed. Please try again.');
+          return;
+        }
+      }
+
+      // Save preference
+      await setBiometricPreference(value);
+      setBiometricAuth(value);
+      showSuccess(value ? 'Biometric authentication enabled' : 'Biometric authentication disabled');
+    } catch (error) {
+      console.error('Error toggling biometric:', error);
+      showError('Failed to update biometric settings');
+    }
+  };
 
   const handleLogout = () => {
     // Keep confirmation using Alert-like behavior? Use a simple confirm-style via toasts is not ideal
@@ -71,7 +126,42 @@ export default function SettingsScreen() {
   };
 
   const handleDeleteAccount = () => {
-    showInfo('Account deletion feature will be available soon!', 'Account Deletion');
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteAccount = async () => {
+    if (!token) {
+      showError('Authentication token missing. Please login again.');
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`${config.BASE_URL}/auth/delete-account`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        showSuccess('Account deleted successfully');
+        setShowDeleteConfirm(false);
+        // Logout user after account deletion
+        await logout();
+        router.replace('/login');
+      } else {
+        showError(data.message || 'Failed to delete account');
+      }
+    } catch (error) {
+      console.error('Delete account error:', error);
+      showError('Failed to delete account. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleClearCache = () => {
@@ -79,13 +169,58 @@ export default function SettingsScreen() {
   };
 
   const handleBackupData = async () => {
+    if (!token) {
+      showError('Authentication token missing. Please login again.');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      // Simulate backup process
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      showSuccess('Data backed up successfully!');
+      // Fetch backup data from backend
+      const response = await fetch(`${config.BASE_URL}/auth/backup-data`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to backup data');
+      }
+
+      // Get JSON data
+      const backupData = await response.json();
+
+      // Convert to JSON string with proper formatting
+      const jsonString = JSON.stringify(backupData, null, 2);
+      
+      // Create filename with timestamp
+      const timestamp = new Date().toISOString().split('T')[0];
+      const filename = `khaata_backup_${timestamp}.json`;
+      
+      // Save file to device
+      const fileUri = `${FileSystem.documentDirectory}${filename}`;
+      await FileSystem.writeAsStringAsync(fileUri, jsonString, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+
+      // Check if sharing is available
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (isAvailable) {
+        // Share/save the file
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'application/json',
+          dialogTitle: 'Save your backup file',
+        });
+        showSuccess('Backup created and ready to save!');
+      } else {
+        showInfo('Backup file saved to device storage', 'Backup Complete');
+      }
     } catch (error) {
-      showError('Failed to backup data. Please try again.');
+      console.error('Backup error:', error);
+      showError(error instanceof Error ? error.message : 'Failed to backup data. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -126,12 +261,21 @@ export default function SettingsScreen() {
     </TouchableOpacity>
   );
 
-  const SwitchComponent = ({ value, onValueChange }: { value: boolean; onValueChange: (value: boolean) => void }) => (
+  const SwitchComponent = ({ 
+    value, 
+    onValueChange, 
+    disabled = false 
+  }: { 
+    value: boolean; 
+    onValueChange: (value: boolean) => void;
+    disabled?: boolean;
+  }) => (
     <Switch
       value={value}
       onValueChange={onValueChange}
       trackColor={{ false: '#e0e0e0', true: '#20B2AA' }}
       thumbColor={value ? '#ffffff' : '#f4f3f4'}
+      disabled={disabled}
     />
   );
 
@@ -208,32 +352,6 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* Notifications */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Notifications</Text>
-          <View style={styles.settingsGroup}>
-            <SettingItem
-              title="Enable Notifications"
-              subtitle="Receive app notifications"
-              icon="🔔"
-              rightComponent={<SwitchComponent value={notificationsEnabled} onValueChange={setNotificationsEnabled} />}
-            />
-            <SettingItem
-              title="Email Notifications"
-              subtitle="Get notified via email"
-              icon="📧"
-              rightComponent={<SwitchComponent value={emailNotifications} onValueChange={setEmailNotifications} />}
-            />
-            <SettingItem
-              title="Push Notifications"
-              subtitle="Receive push notifications"
-              icon="📱"
-              rightComponent={<SwitchComponent value={pushNotifications} onValueChange={setPushNotifications} />}
-              isLast={true}
-            />
-          </View>
-        </View>
-
         {/* App Preferences */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>App Preferences</Text>
@@ -266,15 +384,15 @@ export default function SettingsScreen() {
           <View style={styles.settingsGroup}>
             <SettingItem
               title="Biometric Authentication"
-              subtitle="Use fingerprint or face ID"
+              subtitle={biometricAvailable ? "Use fingerprint or face ID" : "Not available on this device"}
               icon="👆"
-              rightComponent={<SwitchComponent value={biometricAuth} onValueChange={setBiometricAuth} />}
-            />
-            <SettingItem
-              title="Auto Backup"
-              subtitle="Automatically backup your data"
-              icon="☁️"
-              rightComponent={<SwitchComponent value={autoBackup} onValueChange={setAutoBackup} />}
+              rightComponent={
+                <SwitchComponent 
+                  value={biometricAuth} 
+                  onValueChange={handleBiometricToggle}
+                  disabled={!biometricAvailable}
+                />
+              }
               isLast={true}
             />
           </View>
@@ -286,9 +404,10 @@ export default function SettingsScreen() {
           <View style={styles.settingsGroup}>
             <SettingItem
               title="Backup Data"
-              subtitle="Create a backup of your data"
+              subtitle={isLoading ? "Creating backup..." : "Create a backup of your data"}
               icon="💾"
               onPress={handleBackupData}
+              rightComponent={isLoading ? <ActivityIndicator size="small" color="#20B2AA" /> : undefined}
             />
             <SettingItem
               title="Clear Cache"
@@ -337,6 +456,47 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </Animated.View>
       </ScrollView>
+
+      {/* Delete Account Confirmation Modal */}
+      <Modal
+        visible={showDeleteConfirm}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => !isDeleting && setShowDeleteConfirm(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.deleteModalContainer}>
+            <Text style={styles.deleteModalTitle}>⚠️ Delete Account</Text>
+            <Text style={styles.deleteModalMessage}>
+              Are you sure you want to delete your account?
+            </Text>
+            <Text style={styles.deleteModalWarning}>
+              This will erase all your login data, credentials, and all your khaata. This action cannot be undone.
+            </Text>
+            
+            <View style={styles.deleteModalButtons}>
+              <TouchableOpacity
+                style={[styles.deleteModalButton, styles.cancelButton]}
+                onPress={() => setShowDeleteConfirm(false)}
+                disabled={isDeleting}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.deleteModalButton, styles.confirmDeleteButton]}
+                onPress={confirmDeleteAccount}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <Text style={styles.confirmDeleteButtonText}>Deleting...</Text>
+                ) : (
+                  <Text style={styles.confirmDeleteButtonText}>Yes, Delete</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -505,6 +665,78 @@ const styles = StyleSheet.create({
   logoutText: {
     color: 'white',
     fontSize: 18,
+    fontWeight: 'bold',
+  },
+  // Delete Account Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  deleteModalContainer: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  deleteModalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#e74c3c',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  deleteModalMessage: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  deleteModalWarning: {
+    fontSize: 14,
+    color: '#7f8c8d',
+    marginBottom: 24,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  deleteModalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  deleteModalButton: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginHorizontal: 6,
+  },
+  cancelButton: {
+    backgroundColor: '#ecf0f1',
+  },
+  cancelButtonText: {
+    color: '#2c3e50',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  confirmDeleteButton: {
+    backgroundColor: '#e74c3c',
+  },
+  confirmDeleteButtonText: {
+    color: 'white',
+    fontSize: 16,
     fontWeight: 'bold',
   },
 });

@@ -44,7 +44,11 @@ router.post('/add', authenticateToken, [
   body('price')
     .isNumeric()
     .isFloat({ min: 0 })
-    .withMessage('Price must be a positive number')
+    .withMessage('Price must be a positive number'),
+  body('personCount')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Person count must be a positive integer')
 ], async (req, res) => {
   try {
     // Check for validation errors
@@ -57,7 +61,7 @@ router.post('/add', authenticateToken, [
       });
     }
 
-    const { date, mealType, price } = req.body;
+    const { date, mealType, price, personCount = 1 } = req.body;
     const userId = req.userId;
 
     // Check if record already exists for the same date and meal type
@@ -68,18 +72,29 @@ router.post('/add', authenticateToken, [
     });
 
     if (existingRecord) {
+      const dateStr = new Date(date).toLocaleDateString('en-IN', { 
+        weekday: 'short', 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric' 
+      });
       return res.status(400).json({
         success: false,
-        message: `Record already exists for ${mealType} on ${new Date(date).toDateString()}`
+        message: `${mealType} is already added for ${dateStr}. Please select a different date or meal type.`
       });
     }
+
+    // Calculate total price (price per person * person count)
+    const pricePerPerson = parseFloat(price);
+    const totalPrice = pricePerPerson * parseInt(personCount);
 
     // Create new mess record
     const messRecord = new MessRecord({
       user: userId,
       date: new Date(date),
       mealType,
-      price: parseFloat(price)
+      price: totalPrice,
+      personCount: parseInt(personCount)
     });
 
     await messRecord.save();
@@ -93,6 +108,7 @@ router.post('/add', authenticateToken, [
           date: messRecord.date,
           mealType: messRecord.mealType,
           price: messRecord.price,
+          personCount: messRecord.personCount,
           createdAt: messRecord.createdAt
         }
       }
@@ -132,6 +148,7 @@ router.get('/user/:id', authenticateToken, async (req, res) => {
       date: record.date,
       mealType: record.mealType,
       price: record.price,
+      personCount: record.personCount || 1,
       createdAt: record.createdAt
     }));
 
@@ -213,6 +230,7 @@ router.get('/monthly/:id', authenticateToken, async (req, res) => {
       date: record.date,
       mealType: record.mealType,
       price: record.price,
+      personCount: record.personCount || 1,
       createdAt: record.createdAt
     }));
 
@@ -464,6 +482,7 @@ router.get('/dateRange/:id', authenticateToken, async (req, res) => {
       date: record.date,
       mealType: record.mealType,
       price: record.price,
+      personCount: record.personCount || 1,
       createdAt: record.createdAt
     }));
 

@@ -33,7 +33,7 @@ const validationSchema = Yup.object().shape({
 });
 
 export default function RegisterScreen() {
-  const { register } = useAuth();
+  const { requestSignupOtp } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -57,11 +57,15 @@ export default function RegisterScreen() {
     setIsLoading(true);
     
     try {
-      const result = await register(values.name, values.email, values.password, values.confirmPassword);
+      if (values.password !== values.confirmPassword) {
+        showError('Passwords must match');
+        return;
+      }
+      const result = await requestSignupOtp(values.name, values.email, values.password);
       
       if (result.success) {
-        showSuccess(result.message || 'Account created');
-        router.replace('/dashboard');
+        showSuccess('OTP sent to your email');
+        router.push({ pathname: '/verify-otp', params: { email: values.email } });
       } else {
         showError(result.message || 'Registration failed');
       }
@@ -229,24 +233,7 @@ export default function RegisterScreen() {
                     </Text>
                   </TouchableOpacity>
 
-                  {/* Divider */}
-                  <View style={styles.divider}>
-                    <View style={styles.dividerLine} />
-                    <Text style={styles.dividerText}>OR</Text>
-                    <View style={styles.dividerLine} />
-                  </View>
-
-                  {/* Social Login */}
-                  <View style={styles.socialContainer}>
-                    <TouchableOpacity style={styles.socialButton}>
-                      <Text style={styles.socialIcon}>G</Text>
-                      <Text style={styles.socialText}>Google</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.socialButton}>
-                      <Text style={styles.socialIcon}>🍎</Text>
-                      <Text style={styles.socialText}>Apple</Text>
-                    </TouchableOpacity>
-                  </View>
+                  {/* Social login removed for OTP-based signup */}
 
                   {/* Login Link */}
                   <View style={styles.loginContainer}>

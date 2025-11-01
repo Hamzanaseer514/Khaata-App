@@ -115,6 +115,14 @@ export default function DashboardScreen() {
       onPress: () => router.push('/contacts')
     },
     {
+      id: 'personal-khaata',
+      title: 'Personal Khaata',
+      description: 'Track your income & expenses',
+      icon: '📝',
+      color: '#16a085',
+      onPress: () => router.push('/personal-khaata')
+    },
+    {
       id: 'group-khaata',
       title: 'Group Khaata',
       description: 'Split bills with friends',

@@ -20,6 +20,12 @@ const messRecordSchema = new mongoose.Schema({
     required: true,
     min: [0, 'Price cannot be negative']
   },
+  personCount: {
+    type: Number,
+    required: true,
+    default: 1,
+    min: [1, 'Person count must be at least 1']
+  },
 }, { 
   timestamps: true 
 });

@@ -14,6 +14,9 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; message: string }>;
+  requestSignupOtp: (name: string, email: string, password: string) => Promise<{ success: boolean; message: string }>;
+  verifySignupOtp: (email: string, otp: string) => Promise<{ success: boolean; message: string }>;
+  resendSignupOtp?: (email: string) => Promise<{ success: boolean; message: string }>;
   register: (name: string, email: string, password: string, confirmPassword: string) => Promise<{ success: boolean; message: string }>;
   changePassword: (currentPassword: string, newPassword: string, confirmNewPassword: string) => Promise<{ success: boolean; message: string }>;
   logout: () => Promise<void>;
@@ -113,6 +116,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const requestSignupOtp = async (name: string, email: string, password: string) => {
+    try {
+      const response = await fetch(`${config.BASE_URL}/auth/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password }),
+      });
+      const data = await response.json();
+      if (data.success) return { success: true, message: data.message };
+      return { success: false, message: data.message };
+    } catch (e) {
+      console.error('requestSignupOtp error:', e);
+      return { success: false, message: 'Network error. Please try again.' };
+    }
+  };
+
+  const verifySignupOtp = async (email: string, otp: string) => {
+    try {
+      const response = await fetch(`${config.BASE_URL}/auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        const { user: userData, token: authToken } = data.data;
+        await SecureStore.setItemAsync('authToken', authToken);
+        await SecureStore.setItemAsync('userData', JSON.stringify(userData));
+        setToken(authToken);
+        setUser(userData);
+        return { success: true, message: data.message };
+      }
+      return { success: false, message: data.message };
+    } catch (e) {
+      console.error('verifySignupOtp error:', e);
+      return { success: false, message: 'Network error. Please try again.' };
+    }
+  };
+
+  const resendSignupOtp = async (email: string) => {
+    try {
+      const response = await fetch(`${config.BASE_URL}/auth/resend-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await response.json();
+      if (data.success) return { success: true, message: data.message };
+      return { success: false, message: data.message };
+    } catch (e) {
+      console.error('resendSignupOtp error:', e);
+      return { success: false, message: 'Network error. Please try again.' };
+    }
+  };
+
   const changePassword = async (currentPassword: string, newPassword: string, confirmNewPassword: string) => {
     try {
       if (!token) {
@@ -153,7 +211,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, register, changePassword, logout }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, requestSignupOtp, verifySignupOtp, register, changePassword, logout }}>
       {children}
     </AuthContext.Provider>
   );
