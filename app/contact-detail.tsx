@@ -1,4 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { showError, showSuccess } from '@/utils/toast';
 import * as FileSystem from 'expo-file-system/legacy';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -7,6 +8,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -375,10 +377,13 @@ function AddTransactionModal({
   onSuccess: () => void;
 }) {
   const { token } = useAuth();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const [amount, setAmount] = useState('');
   const [payer, setPayer] = useState<'USER' | 'FRIEND'>('USER');
   const [note, setNote] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const placeholderColor = isDark ? '#6b7280' : '#9ca3af';
 
   const handleSubmit = async () => {
     if (!amount || parseFloat(amount) <= 0) {
@@ -421,21 +426,32 @@ function AddTransactionModal({
     }
   };
 
+  // Handle keyboard dismiss on backdrop press
+  const handleBackdropPress = () => {
+    Keyboard.dismiss();
+  };
+
   return (
     <Modal visible={true} transparent={true} animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         style={styles.modalOverlay}
       >
-        <View style={styles.modalContainerCompact}>
-          <View style={styles.modalHeaderCompact}>
-            <Text style={styles.modalTitleCompact}>Add Transaction</Text>
-            <TouchableOpacity onPress={onClose}>
-              <Text style={styles.modalCloseButton}>✕</Text>
-            </TouchableOpacity>
-          </View>
+        <TouchableOpacity
+          activeOpacity={1}
+          style={styles.modalOverlay}
+          onPress={handleBackdropPress}
+        >
+          <View style={styles.modalContainerCompact} onStartShouldSetResponder={() => true}>
+            <View style={styles.modalHeaderCompact}>
+              <Text style={styles.modalTitleCompact}>Add Transaction</Text>
+                <TouchableOpacity onPress={onClose}>
+                  <Text style={styles.modalCloseButton}>✕</Text>
+                </TouchableOpacity>
+              </View>
 
-          <Text style={styles.contactNameTextCompact}>For: {contactName}</Text>
+              <Text style={styles.contactNameTextCompact}>For: {contactName}</Text>
 
           <ScrollView 
             style={styles.modalContentCompact}
@@ -448,6 +464,7 @@ function AddTransactionModal({
               <TextInput
                 style={styles.inputCompact}
                 placeholder="Enter amount"
+                placeholderTextColor={placeholderColor}
                 value={amount}
                 onChangeText={setAmount}
                 keyboardType="numeric"
@@ -497,6 +514,7 @@ function AddTransactionModal({
               <TextInput
                 style={[styles.inputCompact, styles.textAreaCompact]}
                 placeholder="Enter transaction note"
+                placeholderTextColor={placeholderColor}
                 value={note}
                 onChangeText={setNote}
                 multiline
@@ -519,7 +537,8 @@ function AddTransactionModal({
               )}
             </TouchableOpacity>
           </ScrollView>
-        </View>
+          </View>
+        </TouchableOpacity>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -913,6 +932,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     maxHeight: '90%',
     paddingBottom: 20,
+    flexShrink: 0,
   },
   modalHeaderCompact: {
     flexDirection: 'row',
@@ -996,3 +1016,4 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
+

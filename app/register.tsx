@@ -1,4 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { showError, showSuccess } from '@/utils/toast';
 import { router } from 'expo-router';
 import { Formik } from 'formik';
@@ -34,9 +35,12 @@ const validationSchema = Yup.object().shape({
 
 export default function RegisterScreen() {
   const { requestSignupOtp } = useAuth();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const [isLoading, setIsLoading] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
+  const placeholderColor = isDark ? '#6b7280' : '#9ca3af';
 
   React.useEffect(() => {
     Animated.parallel([
@@ -147,7 +151,7 @@ export default function RegisterScreen() {
                         errors.name && touched.name && styles.inputError
                       ]}
                       placeholder="Full Name"
-                      placeholderTextColor="#999"
+                      placeholderTextColor={placeholderColor}
                       value={values.name}
                       onChangeText={handleChange('name')}
                       onBlur={handleBlur('name')}
@@ -167,7 +171,7 @@ export default function RegisterScreen() {
                         errors.email && touched.email && styles.inputError
                       ]}
                       placeholder="Email"
-                      placeholderTextColor="#999"
+                      placeholderTextColor={placeholderColor}
                       value={values.email}
                       onChangeText={handleChange('email')}
                       onBlur={handleBlur('email')}
@@ -188,7 +192,7 @@ export default function RegisterScreen() {
                         errors.password && touched.password && styles.inputError
                       ]}
                       placeholder="Password"
-                      placeholderTextColor="#999"
+                      placeholderTextColor={placeholderColor}
                       value={values.password}
                       onChangeText={handleChange('password')}
                       onBlur={handleBlur('password')}
@@ -209,7 +213,7 @@ export default function RegisterScreen() {
                         errors.confirmPassword && touched.confirmPassword && styles.inputError
                       ]}
                       placeholder="Confirm Password"
-                      placeholderTextColor="#999"
+                      placeholderTextColor={placeholderColor}
                       value={values.confirmPassword}
                       onChangeText={handleChange('confirmPassword')}
                       onBlur={handleBlur('confirmPassword')}

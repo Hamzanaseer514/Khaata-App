@@ -1,3 +1,4 @@
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { showError } from '@/utils/toast';
 import { router } from 'expo-router';
 import React, { useRef, useState } from 'react';
@@ -13,9 +14,12 @@ import {
 } from 'react-native';
 
 export default function ContactSupportScreen() {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const [message, setMessage] = useState('');
+  const placeholderColor = isDark ? '#6b7280' : '#9ca3af';
 
   React.useEffect(() => {
     Animated.parallel([
@@ -148,7 +152,7 @@ export default function ContactSupportScreen() {
             <TextInput
               style={styles.messageInput}
               placeholder="Describe your issue or question here..."
-              placeholderTextColor="#999"
+              placeholderTextColor={placeholderColor}
               value={message}
               onChangeText={setMessage}
               multiline

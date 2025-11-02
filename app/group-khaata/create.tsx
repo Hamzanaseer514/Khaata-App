@@ -1,4 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { showError, showSuccess } from '@/utils/toast';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -23,6 +24,8 @@ interface Contact {
 
 export default function CreateGroupTransactionScreen() {
   const { token } = useAuth();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
   const [totalAmount, setTotalAmount] = useState<string>('');
@@ -31,6 +34,7 @@ export default function CreateGroupTransactionScreen() {
   const [splitMode, setSplitMode] = useState<'equal' | 'manual'>('equal');
   const [manualAmounts, setManualAmounts] = useState<{[contactId: string]: string}>({});
   const [userAmount, setUserAmount] = useState<string>('');
+  const placeholderColor = isDark ? '#6b7280' : '#9ca3af';
 
 
 
@@ -223,6 +227,7 @@ export default function CreateGroupTransactionScreen() {
                     value={manualAmounts[contactId] || ''}
                     onChangeText={(amount) => updateManualAmount(contactId, amount)}
                     placeholder="0.00"
+                    placeholderTextColor={placeholderColor}
                     keyboardType="numeric"
                   />
                 </View>
@@ -259,6 +264,7 @@ export default function CreateGroupTransactionScreen() {
               value={totalAmount}
               onChangeText={setTotalAmount}
               placeholder="Enter total amount"
+              placeholderTextColor={placeholderColor}
               keyboardType="numeric"
             />
           </View>
@@ -270,6 +276,7 @@ export default function CreateGroupTransactionScreen() {
               value={description}
               onChangeText={setDescription}
               placeholder="Enter description"
+              placeholderTextColor={placeholderColor}
               multiline
               numberOfLines={3}
             />
@@ -336,6 +343,7 @@ export default function CreateGroupTransactionScreen() {
                 value={userAmount}
                 onChangeText={setUserAmount}
                 placeholder="Enter your amount"
+                placeholderTextColor={placeholderColor}
                 keyboardType="numeric"
               />
             </View>

@@ -1,4 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { showError } from '@/utils/toast';
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -26,6 +27,8 @@ interface Contact {
 
 export default function ContactsListScreen() {
   const { token } = useAuth();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,6 +37,7 @@ export default function ContactsListScreen() {
   const [showEdit, setShowEdit] = useState(false);
   const [editContactId, setEditContactId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  const placeholderColor = isDark ? '#6b7280' : '#9ca3af';
   const [editEmail, setEditEmail] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -262,7 +266,7 @@ export default function ContactsListScreen() {
           <TextInput
             style={styles.searchInput}
             placeholder="Search contacts..."
-            placeholderTextColor="#95a5a6"
+            placeholderTextColor={placeholderColor}
             value={searchQuery}
             onChangeText={handleSearchChange}
             autoCapitalize="none"

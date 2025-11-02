@@ -1,4 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { showError, showSuccess } from '@/utils/toast';
 import { router } from 'expo-router';
 import { Formik } from 'formik';
@@ -29,9 +30,12 @@ const validationSchema = Yup.object().shape({
 
 export default function ChangePasswordScreen() {
   const { changePassword } = useAuth();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const [isLoading, setIsLoading] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
+  const placeholderColor = isDark ? '#6b7280' : '#9ca3af';
 
   React.useEffect(() => {
     Animated.parallel([
@@ -145,7 +149,7 @@ export default function ChangePasswordScreen() {
                       errors.currentPassword && touched.currentPassword && styles.inputError
                     ]}
                     placeholder="Enter your current password"
-                    placeholderTextColor="#999"
+                    placeholderTextColor={placeholderColor}
                     value={values.currentPassword}
                     onChangeText={handleChange('currentPassword')}
                     onBlur={handleBlur('currentPassword')}
@@ -167,7 +171,7 @@ export default function ChangePasswordScreen() {
                       errors.newPassword && touched.newPassword && styles.inputError
                     ]}
                     placeholder="Enter your new password"
-                    placeholderTextColor="#999"
+                    placeholderTextColor={placeholderColor}
                     value={values.newPassword}
                     onChangeText={handleChange('newPassword')}
                     onBlur={handleBlur('newPassword')}
@@ -189,7 +193,7 @@ export default function ChangePasswordScreen() {
                       errors.confirmNewPassword && touched.confirmNewPassword && styles.inputError
                     ]}
                     placeholder="Confirm your new password"
-                    placeholderTextColor="#999"
+                    placeholderTextColor={placeholderColor}
                     value={values.confirmNewPassword}
                     onChangeText={handleChange('confirmNewPassword')}
                     onBlur={handleBlur('confirmNewPassword')}

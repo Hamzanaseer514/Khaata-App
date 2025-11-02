@@ -1,11 +1,13 @@
 import config from '@/config/config';
 import { useAuth } from '@/contexts/AuthContext';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { showError, showSuccess } from '@/utils/toast';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -607,6 +609,8 @@ function AddTransactionModal({
   onSuccess: () => void;
 }) {
   const { token } = useAuth();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const [amount, setAmount] = useState('');
   const [type, setType] = useState<'INCOME' | 'EXPENSE'>('EXPENSE');
   const [category, setCategory] = useState('');
@@ -617,6 +621,7 @@ function AddTransactionModal({
   const [isLoading, setIsLoading] = useState(false);
 
   const categories = type === 'INCOME' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+  const placeholderColor = isDark ? '#6b7280' : '#9ca3af';
 
   const formatDateForAPI = (date: Date) => {
     return date.toISOString().split('T')[0];
@@ -680,19 +685,30 @@ function AddTransactionModal({
     setCategory('');
   }, [type]);
 
+  // Handle keyboard dismiss on backdrop press
+  const handleBackdropPress = () => {
+    Keyboard.dismiss();
+  };
+
   return (
     <Modal visible={true} transparent={true} animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         style={styles.modalOverlay}
       >
-        <View style={styles.modalContainerCompact}>
-          <View style={styles.modalHeaderCompact}>
-            <Text style={styles.modalTitleCompact}>Add Transaction</Text>
-            <TouchableOpacity onPress={onClose}>
-              <Text style={styles.modalCloseButton}>✕</Text>
-            </TouchableOpacity>
-          </View>
+        <TouchableOpacity
+          activeOpacity={1}
+          style={styles.modalOverlay}
+          onPress={handleBackdropPress}
+        >
+          <View style={styles.modalContainerCompact} onStartShouldSetResponder={() => true}>
+            <View style={styles.modalHeaderCompact}>
+              <Text style={styles.modalTitleCompact}>Add Transaction</Text>
+              <TouchableOpacity onPress={onClose}>
+                <Text style={styles.modalCloseButton}>✕</Text>
+              </TouchableOpacity>
+            </View>
 
           <ScrollView
             style={styles.modalContentCompact}
@@ -705,6 +721,7 @@ function AddTransactionModal({
               <TextInput
                 style={styles.inputCompact}
                 placeholder="Enter amount"
+                placeholderTextColor={placeholderColor}
                 value={amount}
                 onChangeText={setAmount}
                 keyboardType="numeric"
@@ -762,6 +779,7 @@ function AddTransactionModal({
               <TextInput
                 style={[styles.inputCompact, styles.textAreaCompact]}
                 placeholder="Enter description"
+                placeholderTextColor={placeholderColor}
                 value={description}
                 onChangeText={setDescription}
                 multiline
@@ -969,7 +987,8 @@ function AddTransactionModal({
               </View>
             </TouchableOpacity>
           </Modal>
-        </View>
+          </View>
+        </TouchableOpacity>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -986,6 +1005,8 @@ function EditTransactionModal({
   onSuccess: () => void;
 }) {
   const { token } = useAuth();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const [amount, setAmount] = useState(transaction.amount.toString());
   const [type, setType] = useState<'INCOME' | 'EXPENSE'>(transaction.type);
   const [category, setCategory] = useState(transaction.category || '');
@@ -996,6 +1017,7 @@ function EditTransactionModal({
   const [isLoading, setIsLoading] = useState(false);
 
   const categories = type === 'INCOME' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+  const placeholderColor = isDark ? '#6b7280' : '#9ca3af';
 
   const formatDateForAPI = (date: Date) => {
     return date.toISOString().split('T')[0];
@@ -1061,15 +1083,26 @@ function EditTransactionModal({
     }
   };
 
+  // Handle keyboard dismiss on backdrop press
+  const handleBackdropPress = () => {
+    Keyboard.dismiss();
+  };
+
   return (
     <Modal visible={true} transparent={true} animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         style={styles.modalOverlay}
       >
-        <View style={styles.modalContainerCompact}>
-          <View style={styles.modalHeaderCompact}>
-            <Text style={styles.modalTitleCompact}>Edit Transaction</Text>
+        <TouchableOpacity
+          activeOpacity={1}
+          style={styles.modalOverlay}
+          onPress={handleBackdropPress}
+        >
+          <View style={styles.modalContainerCompact} onStartShouldSetResponder={() => true}>
+            <View style={styles.modalHeaderCompact}>
+              <Text style={styles.modalTitleCompact}>Edit Transaction</Text>
             <TouchableOpacity onPress={onClose}>
               <Text style={styles.modalCloseButton}>✕</Text>
             </TouchableOpacity>
@@ -1085,6 +1118,7 @@ function EditTransactionModal({
               <TextInput
                 style={styles.inputCompact}
                 placeholder="Enter amount"
+                placeholderTextColor={placeholderColor}
                 value={amount}
                 onChangeText={setAmount}
                 keyboardType="numeric"
@@ -1137,6 +1171,7 @@ function EditTransactionModal({
               <TextInput
                 style={[styles.inputCompact, styles.textAreaCompact]}
                 placeholder="Enter description"
+                placeholderTextColor={placeholderColor}
                 value={description}
                 onChangeText={setDescription}
                 multiline
@@ -1340,7 +1375,8 @@ function EditTransactionModal({
               </View>
             </TouchableOpacity>
           </Modal>
-        </View>
+          </View>
+        </TouchableOpacity>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -1803,8 +1839,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '85%',
-    paddingBottom: 10,
+    maxHeight: '90%',
+    paddingBottom: 20,
+    flexShrink: 0,
   },
   modalHeaderCompact: {
     flexDirection: 'row',
@@ -2131,4 +2168,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+
 

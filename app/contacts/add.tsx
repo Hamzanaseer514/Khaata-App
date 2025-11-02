@@ -1,4 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { showError, showSuccess } from '@/utils/toast';
 import { router } from 'expo-router';
 import { Formik } from 'formik';
@@ -32,7 +33,10 @@ const validationSchema = Yup.object().shape({
 
 export default function AddContactScreen() {
   const { token } = useAuth();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const [isLoading, setIsLoading] = useState(false);
+  const placeholderColor = isDark ? '#6b7280' : '#9ca3af';
 
   const handleAddContact = async (values: {
     name: string;
@@ -108,6 +112,7 @@ export default function AddContactScreen() {
                       errors.name && touched.name && styles.inputError
                     ]}
                     placeholder="Enter full name"
+                    placeholderTextColor={placeholderColor}
                     value={values.name}
                     onChangeText={handleChange('name')}
                     onBlur={handleBlur('name')}
@@ -128,6 +133,7 @@ export default function AddContactScreen() {
                       errors.phone && touched.phone && styles.inputError
                     ]}
                     placeholder="Enter phone number"
+                    placeholderTextColor={placeholderColor}
                     value={values.phone}
                     onChangeText={handleChange('phone')}
                     onBlur={handleBlur('phone')}
@@ -149,6 +155,7 @@ export default function AddContactScreen() {
                       errors.email && touched.email && styles.inputError
                     ]}
                     placeholder="Enter email address (optional)"
+                    placeholderTextColor={placeholderColor}
                     value={values.email}
                     onChangeText={handleChange('email')}
                     onBlur={handleBlur('email')}

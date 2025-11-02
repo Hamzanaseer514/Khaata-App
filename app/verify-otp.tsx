@@ -1,4 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { showError, showSuccess } from '@/utils/toast';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
@@ -10,6 +11,8 @@ export default function VerifyOtpScreen() {
   const email = params.email || '';
   const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
 
   const onVerify = async () => {
     if (!email) {
@@ -31,18 +34,42 @@ export default function VerifyOtpScreen() {
     }
   };
 
+  const dynamicStyles = {
+    container: {
+      backgroundColor: isDark ? '#151718' : '#f8f9fa',
+    },
+    card: {
+      backgroundColor: isDark ? '#1e1e1e' : '#fff',
+      shadowColor: '#000',
+      shadowOpacity: isDark ? 0.3 : 0.08,
+    },
+    title: {
+      color: isDark ? '#ECEDEE' : '#111827',
+    },
+    subtitle: {
+      color: isDark ? '#9BA1A6' : '#6b7280',
+    },
+    input: {
+      borderColor: isDark ? '#3a3a3a' : '#e5e7eb',
+      backgroundColor: isDark ? '#2a2a2a' : '#fff',
+      color: isDark ? '#ECEDEE' : '#111827',
+    },
+  };
+
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <View style={styles.card}>
-        <Text style={styles.title}>Verify your email</Text>
-        <Text style={styles.subtitle}>Enter the code sent to {email}</Text>
+    <KeyboardAvoidingView style={[styles.container, dynamicStyles.container]} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <View style={[styles.card, dynamicStyles.card]}>
+        <Text style={[styles.title, dynamicStyles.title]}>Verify your email</Text>
+        <Text style={[styles.subtitle, dynamicStyles.subtitle]}>Enter the code sent to {email}</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, dynamicStyles.input]}
           keyboardType="number-pad"
           maxLength={6}
           placeholder="6-digit code"
+          placeholderTextColor={isDark ? '#6b7280' : '#9ca3af'}
           value={otp}
           onChangeText={setOtp}
+          autoFocus
         />
         <TouchableOpacity style={[styles.button, isLoading && styles.buttonDisabled]} onPress={onVerify} disabled={isLoading}>
           <Text style={styles.buttonText}>{isLoading ? 'Verifying…' : 'Verify & Create Account'}</Text>
@@ -53,14 +80,52 @@ export default function VerifyOtpScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa', justifyContent: 'center', padding: 24 },
-  card: { backgroundColor: '#fff', borderRadius: 16, padding: 20, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 3 },
-  title: { fontSize: 20, fontWeight: '700', color: '#111827', marginBottom: 6 },
-  subtitle: { fontSize: 14, color: '#6b7280', marginBottom: 16 },
-  input: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, marginBottom: 16, backgroundColor: '#fff' },
-  button: { backgroundColor: '#20B2AA', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  buttonDisabled: { backgroundColor: '#9ca3af' },
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 24,
+  },
+  card: {
+    borderRadius: 16,
+    padding: 20,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  subtitle: {
+    fontSize: 14,
+    marginBottom: 16,
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 16,
+    textAlign: 'center',
+    letterSpacing: 4,
+  },
+  button: {
+    backgroundColor: '#20B2AA',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  buttonDisabled: {
+    backgroundColor: '#9ca3af',
+  },
 });
 
 
