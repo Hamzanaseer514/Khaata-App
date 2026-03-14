@@ -14,7 +14,17 @@ const notificationSchema = new mongoose.Schema({
   contactId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Contact',
-    required: true
+    required: false
+  },
+  type: {
+    type: String,
+    enum: ['email', 'admin-alert'],
+    default: 'email'
+  },
+  title: {
+    type: String,
+    trim: true,
+    default: ''
   },
   message: {
     type: String,
@@ -30,6 +40,10 @@ const notificationSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  isRead: {
+    type: Boolean,
+    default: false
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -40,5 +54,6 @@ const notificationSchema = new mongoose.Schema({
 notificationSchema.index({ userId: 1, createdAt: -1 });
 notificationSchema.index({ status: 1 });
 notificationSchema.index({ transactionId: 1 });
+notificationSchema.index({ userId: 1, type: 1, isRead: 1 });
 
 module.exports = mongoose.model('Notification', notificationSchema);

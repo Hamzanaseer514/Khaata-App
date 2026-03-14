@@ -226,12 +226,12 @@ export default function DashboardScreen() {
             <View style={styles.rowBetween}>
               <View style={styles.summaryCol}>
                 <Text style={styles.kpiLabel}>Receivables</Text>
-                <Text style={styles.kpiValue}>₹{formatAmount(receivablesAmount)}</Text>
+                <Text style={styles.kpiValue}>Rs {formatAmount(receivablesAmount)}</Text>
                 <Text style={styles.kpiSub}>{contactsOwingCount} contacts</Text>
               </View>
               <View style={styles.summaryCol}>
                 <Text style={styles.kpiLabel}>Payables</Text>
-                <Text style={styles.kpiValue}>₹{formatAmount(payablesAmount)}</Text>
+                <Text style={styles.kpiValue}>Rs {formatAmount(payablesAmount)}</Text>
                 <Text style={styles.kpiSub}>{contactsYouOweCount} contacts</Text>
               </View>
             </View>
@@ -252,7 +252,7 @@ export default function DashboardScreen() {
                   <View style={styles.barBg}>
                     <View style={[styles.barFill, { width: getBarWidth(item.amount, topOwing) }]} />
                   </View>
-                  <Text style={styles.barValue}>₹{formatAmount(item.amount)}</Text>
+                  <Text style={styles.barValue}>Rs {formatAmount(item.amount)}</Text>
                 </View>
               ))}
             </View>
@@ -293,13 +293,13 @@ export default function DashboardScreen() {
               </View>
               <View style={styles.legendRow}>
                 <View style={[styles.legendDot, { backgroundColor: '#20B2AA' }]} />
-                <Text style={styles.legendText}>You paid: ₹{formatAmount(monthlyBars[monthlyBars.length - 1].userPaid)}</Text>
+                <Text style={styles.legendText}>You paid: Rs {formatAmount(monthlyBars[monthlyBars.length - 1].userPaid)}</Text>
               </View>
               <View style={styles.legendRow}>
                 <View style={[styles.legendDot, { backgroundColor: '#f39c12' }]} />
-                <Text style={styles.legendText}>Friend paid: ₹{formatAmount(monthlyBars[monthlyBars.length - 1].friendPaid)}</Text>
+                <Text style={styles.legendText}>Friend paid: Rs {formatAmount(monthlyBars[monthlyBars.length - 1].friendPaid)}</Text>
               </View>
-              <Text style={[styles.kpiLabel, { marginTop: 6 }]}>Net (You − Friend): ₹{formatAmount(monthlyBars[monthlyBars.length - 1].net)}</Text>
+              <Text style={[styles.kpiLabel, { marginTop: 6 }]}>Net (You − Friend): Rs {formatAmount(monthlyBars[monthlyBars.length - 1].net)}</Text>
             </View>
           )}
 
@@ -334,7 +334,7 @@ export default function DashboardScreen() {
               <Text style={styles.statLabel}>Total Contacts</Text>
             </View>
             <View style={styles.smallCard}>
-              <Text style={styles.smallNumber}>₹{formatAmount(receivablesAmount - payablesAmount)}</Text>
+              <Text style={styles.smallNumber}>Rs {formatAmount(receivablesAmount - payablesAmount)}</Text>
               <Text style={styles.statLabel}>Net Receivable</Text>
             </View>
           </View>

@@ -134,7 +134,7 @@ export default function CreateGroupTransactionScreen() {
 
     // Additional validation for manual mode
     if (splitMode === 'manual' && !isManualAmountValid()) {
-      showError(`Manual amounts total (₹${getTotalManualAmount().toFixed(2)}) must equal the total amount (₹${totalAmount})`);
+      showError(`Manual amounts total (Rs ${getTotalManualAmount().toFixed(2)}) must equal the total amount (Rs ${totalAmount})`);
       return;
     }
 
@@ -177,7 +177,7 @@ export default function CreateGroupTransactionScreen() {
       const data = await response.json();
 
       if (data.success) {
-        showSuccess(`Group transaction created successfully! Per person: ₹${data.data.perPersonShare}`);
+        showSuccess(`Group transaction created successfully! Per person: Rs ${data.data.perPersonShare}`);
         router.back();
       } else {
         showError(data.message || 'Failed to create group transaction');
@@ -221,7 +221,7 @@ export default function CreateGroupTransactionScreen() {
               {/* Manual Amount Input */}
               {splitMode === 'manual' && (
                 <View style={styles.manualAmountContainer}>
-                  <Text style={styles.manualAmountLabel}>Amount (₹)</Text>
+                  <Text style={styles.manualAmountLabel}>Amount (Rs)</Text>
                   <TextInput
                     style={styles.manualAmountInput}
                     value={manualAmounts[contactId] || ''}
@@ -258,7 +258,7 @@ export default function CreateGroupTransactionScreen() {
           <Text style={styles.sectionTitle}>Transaction Details</Text>
           
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Total Amount (₹)</Text>
+            <Text style={styles.label}>Total Amount (Rs)</Text>
             <TextInput
               style={styles.input}
               value={totalAmount}
@@ -337,7 +337,7 @@ export default function CreateGroupTransactionScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Your Amount</Text>
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Your Share (₹)</Text>
+              <Text style={styles.label}>Your Share (Rs)</Text>
               <TextInput
                 style={styles.input}
                 value={userAmount}
@@ -384,7 +384,7 @@ export default function CreateGroupTransactionScreen() {
             <View style={styles.summaryCard}>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Total Amount:</Text>
-                <Text style={styles.summaryValue}>₹{totalAmount}</Text>
+                <Text style={styles.summaryValue}>Rs {totalAmount}</Text>
               </View>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Members (incl. You):</Text>
@@ -394,17 +394,17 @@ export default function CreateGroupTransactionScreen() {
               {splitMode === 'equal' ? (
                 <View style={styles.summaryRow}>
                   <Text style={styles.summaryLabel}>Per Person Share:</Text>
-                  <Text style={styles.summaryValue}>₹{calculatePerPersonShare()}</Text>
+                  <Text style={styles.summaryValue}>Rs {calculatePerPersonShare()}</Text>
                 </View>
               ) : (
                 <>
                   <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Your Amount:</Text>
-                    <Text style={styles.summaryValue}>₹{parseFloat(userAmount || '0').toFixed(2)}</Text>
+                    <Text style={styles.summaryValue}>Rs {parseFloat(userAmount || '0').toFixed(2)}</Text>
                   </View>
                   <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Contacts Total:</Text>
-                    <Text style={styles.summaryValue}>₹{Object.values(manualAmounts).reduce((sum, amount) => sum + (parseFloat(amount) || 0), 0).toFixed(2)}</Text>
+                    <Text style={styles.summaryValue}>Rs {Object.values(manualAmounts).reduce((sum, amount) => sum + (parseFloat(amount) || 0), 0).toFixed(2)}</Text>
                   </View>
                   <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Manual Total:</Text>
@@ -412,7 +412,7 @@ export default function CreateGroupTransactionScreen() {
                       styles.summaryValue,
                       !isManualAmountValid() && styles.errorText
                     ]}>
-                      ₹{getTotalManualAmount().toFixed(2)}
+                      Rs {getTotalManualAmount().toFixed(2)}
                     </Text>
                   </View>
                   {!isManualAmountValid() && (

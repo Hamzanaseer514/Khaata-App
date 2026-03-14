@@ -1,8 +1,8 @@
 import { useAuth } from '@/contexts/AuthContext';
+import { authenticateWithBiometric, getBiometricPreference } from '@/utils/biometric';
 import { router, useSegments } from 'expo-router';
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View, Modal, TouchableOpacity, AppState, AppStateStatus } from 'react-native';
-import { getBiometricPreference, authenticateWithBiometric } from '@/utils/biometric';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, AppStateStatus, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function AuthWrapper({ children }: { children: React.ReactNode }) {
   const { user, isLoading, logout } = useAuth();
@@ -92,24 +92,29 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
   React.useEffect(() => {
     if (isLoading) return;
 
-    const inTabsGroup = segments[0] === 'dashboard';
-    const inAuthScreens = segments[0] === 'login' || segments[0] === 'register' || segments[0] === 'verify-otp';
     const inDashboard = segments[0] === 'dashboard';
+    const inAdmin = segments[0] === 'admin';
+    const inProtected = inDashboard || inAdmin;
+    const inAuthScreens = segments[0] === 'login' || segments[0] === 'register' || segments[0] === 'verify-otp';
 
     console.log('AuthWrapper - segments:', segments);   
     console.log('AuthWrapper - user:', user);
-    console.log('AuthWrapper - inTabsGroup:', inTabsGroup);
     console.log('AuthWrapper - inAuthScreens:', inAuthScreens);
     console.log('AuthWrapper - inDashboard:', inDashboard); 
+    console.log('AuthWrapper - inAdmin:', inAdmin); 
 
-    if (!user && (inTabsGroup || inDashboard)) {
+    if (!user && inProtected) {
       // User is not authenticated but trying to access protected routes
       console.log('Redirecting to login');
       router.replace('/login');
     } else if (user && inAuthScreens) {
       // User is authenticated but on auth screens, redirect to main app
       console.log('Redirecting to dashboard');
-      router.replace('/dashboard');
+      if (user.role === 'admin') {
+        router.replace('/admin');
+      } else {
+        router.replace('/dashboard');
+      }
     }
   }, [user, isLoading, segments]);
 

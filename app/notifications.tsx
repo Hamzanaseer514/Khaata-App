@@ -151,7 +151,7 @@ export default function NotificationsScreen() {
         <View style={styles.transactionDetails}>
           <View style={styles.transactionRow}>
             <Text style={styles.transactionLabel}>Amount:</Text>
-            <Text style={styles.transactionValue}>₹{item.transactionDetails.amount}</Text>
+            <Text style={styles.transactionValue}>Rs {item.transactionDetails.amount}</Text>
           </View>
           <View style={styles.transactionRow}>
             <Text style={styles.transactionLabel}>Type:</Text>

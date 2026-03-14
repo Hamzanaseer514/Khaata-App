@@ -210,7 +210,7 @@ export default function PersonalKhaataScreen() {
   };
 
   const formatAmount = (amount: number) => {
-    return `₹${Math.abs(amount).toFixed(2)}`;
+    return `Rs ${Math.abs(amount).toFixed(2)}`;
   };
 
   const renderTransaction = ({ item }: { item: PersonalTransaction }) => {
@@ -431,11 +431,11 @@ export default function PersonalKhaataScreen() {
       <View style={styles.summaryContainer}>
         <View style={[styles.summaryCard, styles.incomeCard]}>
           <Text style={styles.summaryLabel} numberOfLines={1}>Total Income</Text>
-          <Text style={styles.summaryAmount} numberOfLines={1}>+₹{summary.totalIncome.toFixed(2)}</Text>
+          <Text style={styles.summaryAmount} numberOfLines={1}>+Rs {summary.totalIncome.toFixed(2)}</Text>
         </View>
         <View style={[styles.summaryCard, styles.expenseCard]}>
           <Text style={styles.summaryLabel} numberOfLines={1}>Total Expense</Text>
-          <Text style={styles.summaryAmount} numberOfLines={1}>-₹{summary.totalExpense.toFixed(2)}</Text>
+          <Text style={styles.summaryAmount} numberOfLines={1}>-Rs {summary.totalExpense.toFixed(2)}</Text>
         </View>
         <View style={[styles.summaryCard, styles.balanceCard]}>
           <Text style={styles.summaryLabel} numberOfLines={1}>Net Balance</Text>
@@ -443,7 +443,7 @@ export default function PersonalKhaataScreen() {
             styles.summaryAmount,
             summary.netBalance >= 0 ? styles.positiveBalance : styles.negativeBalance
           ]} numberOfLines={1}>
-            {summary.netBalance >= 0 ? '+' : ''}₹{summary.netBalance.toFixed(2)}
+            {summary.netBalance >= 0 ? '+' : ''}Rs {summary.netBalance.toFixed(2)}
           </Text>
         </View>
       </View>

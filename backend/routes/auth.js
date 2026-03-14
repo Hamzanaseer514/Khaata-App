@@ -2,39 +2,22 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
-
-// Middleware to verify JWT token
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({
-      success: false,
-      message: 'Access token required'
-    });
-  }
-
-  jwt.verify(token, JWT_SECRET, (err, decoded) => {
-    if (err) {
-      return res.status(403).json({
-        success: false,
-        message: 'Invalid or expired token'
-      });
-    }
-    req.userId = decoded.userId;
-    next();
-  });
-};
+const { authenticateToken, JWT_SECRET } = require('../middleware/auth');
 
 const router = express.Router();
 
-// JWT Secret (in production, use environment variable)
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+// Ensure we preserve admin role even if DB role is missing but email matches ADMIN_EMAIL
+const resolveRole = (email, role) => {
+  const adminEmail = (process.env.ADMIN_EMAIL || process.env.EMAIL_USER || '').toLowerCase();
+  if (adminEmail && typeof email === 'string' && email.toLowerCase() === adminEmail) {
+    return 'admin';
+  }
+  return role || 'user';
+};
 
 // Generate JWT token
-const generateToken = (userId) => {
-  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d' });
+const generateToken = (userId, role) => {
+  return jwt.sign({ userId, role }, JWT_SECRET, { expiresIn: '7d' });
 };
 
 // In-memory OTP store (email -> { code, expiresAt, payload })
@@ -47,7 +30,7 @@ const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString()
 // Send OTP for signup
 router.post('/send-otp', [
   body('name').trim().isLength({ min: 2, max: 50 }),
-  body('email').isEmail().normalizeEmail(),
+  body('email').isEmail().normalizeEmail({ gmail_remove_dots: false }),
   body('password').isLength({ min: 6 }),
 ], async (req, res) => {
   try {
@@ -136,7 +119,7 @@ router.post('/send-otp', [
 
 // Verify OTP and create account
 router.post('/verify-otp', [
-  body('email').isEmail().normalizeEmail(),
+  body('email').isEmail().normalizeEmail({ gmail_remove_dots: false }),
   body('otp').isLength({ min: 4, max: 6 }),
 ], async (req, res) => {
   try {
@@ -164,12 +147,13 @@ router.post('/verify-otp', [
     await user.save();
     pendingOtps.delete(email);
 
-    const token = generateToken(user._id);
+    const resolvedRole = resolveRole(user.email, user.role);
+    const token = generateToken(user._id, resolvedRole);
     return res.json({
       success: true,
       message: 'Signup verified',
       data: {
-        user: { id: user._id, name: user.name, email: user.email, createdAt: user.createdAt },
+        user: { id: user._id, name: user.name, email: user.email, createdAt: user.createdAt, role: resolvedRole },
         token,
       },
     });
@@ -180,7 +164,7 @@ router.post('/verify-otp', [
 });
 
 // Resend OTP using existing pending payload
-router.post('/resend-otp', [body('email').isEmail().normalizeEmail()], async (req, res) => {
+router.post('/resend-otp', [body('email').isEmail().normalizeEmail({ gmail_remove_dots: false })], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -230,7 +214,7 @@ router.post('/register', [
     .withMessage('Name must be between 2 and 50 characters'),
   body('email')
     .isEmail()
-    .normalizeEmail()
+    .normalizeEmail({ gmail_remove_dots: false })
     .withMessage('Please provide a valid email'),
   body('password')
     .isLength({ min: 6 })
@@ -274,8 +258,9 @@ router.post('/register', [
 
     await user.save();
 
+    const resolvedRole = resolveRole(user.email, user.role);
     // Generate JWT token
-    const token = generateToken(user._id);
+    const token = generateToken(user._id, resolvedRole);
 
     res.status(201).json({
       success: true,
@@ -285,7 +270,8 @@ router.post('/register', [
           id: user._id,
           name: user.name,
           email: user.email,
-          createdAt: user.createdAt
+          createdAt: user.createdAt,
+          role: resolvedRole,
         },
         token
       }
@@ -305,16 +291,20 @@ router.post('/register', [
 router.post('/login', [
   body('email')
     .isEmail()
-    .normalizeEmail()
+    .normalizeEmail({ gmail_remove_dots: false })
     .withMessage('Please provide a valid email'),
   body('password')
     .notEmpty()
     .withMessage('Password is required')
 ], async (req, res) => {
   try {
+    // Debug logs (safe, no passwords)
+    console.log('[LOGIN] attempt', { email: req.body?.email });
+
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('[LOGIN] validation failed', errors.array());
       return res.status(400).json({
         success: false,
         message: 'Validation failed',
@@ -326,6 +316,7 @@ router.post('/login', [
 
     // Find user by email
     const user = await User.findOne({ email });
+    console.log('[LOGIN] user lookup', user ? { id: user._id, email: user.email, role: user.role } : null);
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -335,6 +326,7 @@ router.post('/login', [
 
     // Check password
     const isPasswordValid = await user.comparePassword(password);
+    console.log('[LOGIN] password valid?', isPasswordValid);
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
@@ -342,8 +334,9 @@ router.post('/login', [
       });
     }
 
+    const resolvedRole = resolveRole(user.email, user.role);
     // Generate JWT token
-    const token = generateToken(user._id);
+    const token = generateToken(user._id, resolvedRole);
 
     res.json({
       success: true,
@@ -353,7 +346,8 @@ router.post('/login', [
           id: user._id,
           name: user.name,
           email: user.email,
-          createdAt: user.createdAt
+          createdAt: user.createdAt,
+          role: resolvedRole,
         },
         token
       }

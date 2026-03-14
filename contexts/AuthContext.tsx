@@ -7,13 +7,14 @@ interface User {
   name: string;
   email: string;
   createdAt: string;
+  role?: 'user' | 'admin';
 }
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; message: string }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; message: string; user?: User | null; token?: string | null }>;
   requestSignupOtp: (name: string, email: string, password: string) => Promise<{ success: boolean; message: string }>;
   verifySignupOtp: (email: string, otp: string) => Promise<{ success: boolean; message: string }>;
   resendSignupOtp?: (email: string) => Promise<{ success: boolean; message: string }>;
@@ -39,8 +40,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const storedUser = await SecureStore.getItemAsync('userData');
       
       if (storedToken && storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        const normalizedUser = { ...parsedUser, role: parsedUser.role || 'user' };
         setToken(storedToken);
-        setUser(JSON.parse(storedUser));
+        setUser(normalizedUser);
       }
     } catch (error) {
       console.error('Error loading stored auth:', error);
@@ -64,16 +67,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (data.success) {
         const { user: userData, token: authToken } = data.data;
+        const normalizedUser = { ...userData, role: userData.role || 'user' };
         
         // Store in SecureStore
         await SecureStore.setItemAsync('authToken', authToken);
-        await SecureStore.setItemAsync('userData', JSON.stringify(userData));
+        await SecureStore.setItemAsync('userData', JSON.stringify(normalizedUser));
         
         // Update state
         setToken(authToken);
-        setUser(userData);
+        setUser(normalizedUser);
         
-        return { success: true, message: data.message };
+        return { success: true, message: data.message, user: normalizedUser, token: authToken };
       } else {
         return { success: false, message: data.message };
       }
@@ -97,14 +101,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (data.success) {
         const { user: userData, token: authToken } = data.data;
+        const normalizedUser = { ...userData, role: userData.role || 'user' };
         
         // Store in SecureStore
         await SecureStore.setItemAsync('authToken', authToken);
-        await SecureStore.setItemAsync('userData', JSON.stringify(userData));
+        await SecureStore.setItemAsync('userData', JSON.stringify(normalizedUser));
         
         // Update state
         setToken(authToken);
-        setUser(userData);
+        setUser(normalizedUser);
         
         return { success: true, message: data.message };
       } else {
@@ -142,10 +147,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await response.json();
       if (data.success) {
         const { user: userData, token: authToken } = data.data;
+        const normalizedUser = { ...userData, role: userData.role || 'user' };
         await SecureStore.setItemAsync('authToken', authToken);
-        await SecureStore.setItemAsync('userData', JSON.stringify(userData));
+        await SecureStore.setItemAsync('userData', JSON.stringify(normalizedUser));
         setToken(authToken);
-        setUser(userData);
+        setUser(normalizedUser);
         return { success: true, message: data.message };
       }
       return { success: false, message: data.message };
@@ -211,7 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, requestSignupOtp, verifySignupOtp, register, changePassword, logout }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, requestSignupOtp, verifySignupOtp, resendSignupOtp, register, changePassword, logout }}>
       {children}
     </AuthContext.Provider>
   );

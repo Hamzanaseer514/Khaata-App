@@ -249,7 +249,7 @@ export default function MessScreen() {
   };
 
   const formatPrice = (price: number) => {
-    return `₹${price.toFixed(2)}`;
+    return `Rs ${price.toFixed(2)}`;
   };
 
 

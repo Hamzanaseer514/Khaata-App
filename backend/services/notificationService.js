@@ -161,9 +161,9 @@ const createGroupTransactionNotification = async (groupTransaction, userId, cont
         
         if (splitMode === 'manual' && individualAmountsObj[contactIdStr] !== undefined) {
           contactAmount = individualAmountsObj[contactIdStr];
-          console.log(`Using manual amount for ${contact.name}: ₹${contactAmount}`);
+          console.log(`Using manual amount for ${contact.name}: Rs ${contactAmount}`);
         } else {
-          console.log(`Using equal share for ${contact.name}: ₹${contactAmount}`);
+          console.log(`Using equal share for ${contact.name}: Rs ${contactAmount}`);
         }
         
         // Create notification record

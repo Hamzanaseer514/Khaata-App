@@ -6,19 +6,19 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  FlatList,
-  Keyboard,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    FlatList,
+    Keyboard,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import config from '../config/config';
 
@@ -230,7 +230,7 @@ export default function ContactDetailScreen() {
             styles.transactionAmount,
             { color: item.payer === 'USER' ? '#27ae60' : '#e74c3c' }
           ]}>
-            {item.payer === 'USER' ? '+' : '-'}₹{item.amount.toFixed(2)}
+            {item.payer === 'USER' ? '+' : '-'}Rs {item.amount.toFixed(2)}
           </Text>
         </View>
         {item.note && (
@@ -313,7 +313,7 @@ export default function ContactDetailScreen() {
             styles.balanceAmount,
             { color: contact.balance > 0 ? '#27ae60' : contact.balance < 0 ? '#e74c3c' : '#7f8c8d' }
           ]}>
-            ₹{Math.abs(contact.balance).toFixed(2)}
+            Rs {Math.abs(contact.balance).toFixed(2)}
           </Text>
           <Text style={styles.balanceLabel}>
             {contact.balance > 0 ? 'Friend owes you' : contact.balance < 0 ? 'You owe friend' : 'All settled'}

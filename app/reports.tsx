@@ -222,7 +222,7 @@ export default function ReportsScreen() {
             styles.balanceText,
             { color: item.balance >= 0 ? '#27ae60' : '#e74c3c' }
           ]}>
-            Balance: ₹{Math.abs(item.balance)} {item.balance >= 0 ? '(You owe)' : '(They owe)'}
+            Balance: Rs {Math.abs(item.balance)} {item.balance >= 0 ? '(You owe)' : '(They owe)'}
           </Text>
         </View>
       </View>

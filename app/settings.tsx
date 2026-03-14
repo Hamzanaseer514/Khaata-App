@@ -32,7 +32,7 @@ export default function SettingsScreen() {
 
   // Settings states
   const [darkMode, setDarkMode] = useState(false);
-  const [currency, setCurrency] = useState('₹');
+  const [currency, setCurrency] = useState('Rs');
   const [language, setLanguage] = useState('English');
   const [biometricAuth, setBiometricAuth] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);

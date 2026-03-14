@@ -237,7 +237,7 @@ export default function MessAnalyticsScreen() {
 
   const formatPrice = (price: number) => {
     const value = isFinite(price as any) ? price : 0;
-    return `₹${value.toFixed(2)}`;
+    return `Rs ${value.toFixed(2)}`;
   };
 
   const formatNumber = (num: number) => {
@@ -354,7 +354,7 @@ export default function MessAnalyticsScreen() {
                 {filteredMonths.map((m) => (
                   <TouchableOpacity key={`${m.year}-${m.month}`} style={styles.monthPill} onPress={() => loadSpecificMonth(m.year, m.month)}>
                     <Text style={styles.monthPillLabel}>{m.monthName}</Text>
-                    <Text style={styles.monthPillSub}>₹{m.totalAmount.toFixed(0)} • {m.totalMeals} meals</Text>
+                    <Text style={styles.monthPillSub}>Rs {m.totalAmount.toFixed(0)} • {m.totalMeals} meals</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -457,7 +457,7 @@ export default function MessAnalyticsScreen() {
                 <Text style={styles.averageLabel}>Meals/Day</Text>
               </View>
               <View style={styles.averageItem}>
-                <Text style={styles.averageValue}>₹{analytics.avgSpentPerDay.toFixed(2)}</Text>
+                <Text style={styles.averageValue}>Rs {analytics.avgSpentPerDay.toFixed(2)}</Text>
                 <Text style={styles.averageLabel}>Spent/Day</Text>
               </View>
               <View style={styles.averageItem}>

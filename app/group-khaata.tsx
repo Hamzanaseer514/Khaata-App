@@ -102,9 +102,9 @@ export default function GroupKhaataScreen() {
           </Text>
         </View>
         <View style={styles.transactionAmountContainer}>
-          <Text style={styles.transactionAmount}>₹{item.totalAmount}</Text>
+          <Text style={styles.transactionAmount}>Rs {item.totalAmount}</Text>
           <Text style={styles.perPersonText}>
-            {item.splitMode === 'manual' ? 'Custom amounts' : `₹${item.perPersonShare} each`}
+            {item.splitMode === 'manual' ? 'Custom amounts' : `Rs ${item.perPersonShare} each`}
           </Text>
         </View>
       </View>

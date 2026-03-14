@@ -34,12 +34,12 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// GET /api/notifications - Get all notifications for the logged-in user
+// GET /api/notifications - Get all notifications (email-type) for the logged-in user
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     
-    const notifications = await Notification.find({ userId })
+    const notifications = await Notification.find({ userId, type: 'email' })
       .populate('transactionId', 'amount payer note createdAt')
       .populate('contactId', 'name email')
       .sort({ createdAt: -1 })
@@ -74,6 +74,54 @@ router.get('/', authenticateToken, async (req, res) => {
       message: 'Internal server error',
       error: error.message
     });
+  }
+});
+
+// GET /api/notifications/alerts - admin alerts (in-app)
+router.get('/alerts', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const alerts = await Notification.find({ userId, type: 'admin-alert' })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean();
+    const unreadCount = alerts.filter(a => !a.isRead).length;
+    return res.json({ success: true, data: { alerts, unreadCount } });
+  } catch (error) {
+    console.error('Error fetching alerts:', error);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// PATCH /api/notifications/alerts/read - mark all admin alerts as read
+router.patch('/alerts/read', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    await Notification.updateMany({ userId, type: 'admin-alert', isRead: false }, { $set: { isRead: true } });
+    return res.json({ success: true, message: 'Alerts marked as read' });
+  } catch (error) {
+    console.error('Error marking alerts read:', error);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// PATCH /api/notifications/alerts/:id/read - mark single admin alert as read
+router.patch('/alerts/:id/read', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const alertId = req.params.id;
+    const updated = await Notification.findOneAndUpdate(
+      { _id: alertId, userId, type: 'admin-alert' },
+      { $set: { isRead: true } },
+      { new: true }
+    );
+    if (!updated) {
+      return res.status(404).json({ success: false, message: 'Alert not found' });
+    }
+    return res.json({ success: true, message: 'Alert marked as read', data: updated });
+  } catch (error) {
+    console.error('Error marking alert read:', error);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
 

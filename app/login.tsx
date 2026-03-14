@@ -55,8 +55,9 @@ export default function LoginScreen() {
       const result = await login(values.email, values.password);
       
       if (result.success) {
-        showSuccess(result.message || 'Logged in');
-        router.replace('/dashboard');
+        const isAdmin = result.user?.role === 'admin';
+        showSuccess(result.message || (isAdmin ? 'Welcome admin' : 'Logged in'));
+        router.replace(isAdmin ? '/admin' : '/dashboard');
       } else {
         showError(result.message || 'Login failed');
       }

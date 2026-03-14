@@ -47,8 +47,12 @@ export default function WelcomeScreen() {
     // Small delay to ensure screen is visible
     const timer = setTimeout(() => {
       if (user) {
-        // User is authenticated, go to dashboard
-        router.replace('/dashboard');
+        // User is authenticated, go to appropriate area
+        if (user.role === 'admin') {
+          router.replace('/admin');
+        } else {
+          router.replace('/dashboard');
+        }
       } else {
         // User is not authenticated, go to login
         router.replace('/login');

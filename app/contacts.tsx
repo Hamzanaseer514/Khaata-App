@@ -195,7 +195,7 @@ export default function ContactsListScreen() {
       </View>
       <View style={styles.contactBalance}>
           <Text style={[styles.balanceAmount, { color: item.balance > 0 ? '#27ae60' : item.balance < 0 ? '#e74c3c' : '#7f8c8d' }]}>
-          ₹{Math.abs(item.balance).toFixed(2)}
+          Rs {Math.abs(item.balance).toFixed(2)}
         </Text>
         <Text style={styles.balanceLabel}>
           {item.balance > 0 ? 'Friend owes' : item.balance < 0 ? 'You owe' : 'Settled'}

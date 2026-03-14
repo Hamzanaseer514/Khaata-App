@@ -128,7 +128,7 @@ export default function GroupTransactionDetailScreen() {
           <View style={styles.amountSection}>
             <View style={styles.totalAmountContainer}>
               <Text style={styles.totalAmountLabel}>Total Amount</Text>
-              <Text style={styles.totalAmount}>₹{transaction.totalAmount}</Text>
+              <Text style={styles.totalAmount}>Rs {transaction.totalAmount}</Text>
             </View>
             
             <View style={styles.perPersonContainer}>
@@ -136,7 +136,7 @@ export default function GroupTransactionDetailScreen() {
                 {transaction.splitMode === 'manual' ? 'Split Type' : 'Per Person Share'}
               </Text>
               <Text style={styles.perPersonAmount}>
-                {transaction.splitMode === 'manual' ? 'Custom' : `₹${transaction.perPersonShare}`}
+                {transaction.splitMode === 'manual' ? 'Custom' : `Rs ${transaction.perPersonShare}`}
               </Text>
             </View>
           </View>
@@ -180,7 +180,7 @@ export default function GroupTransactionDetailScreen() {
                     <Text style={styles.memberName}>{name}</Text>
                   </View>
                   <View style={styles.memberAmount}>
-                    <Text style={styles.memberAmountText}>₹{(individualAmount || 0).toFixed(2)}</Text>
+                    <Text style={styles.memberAmountText}>Rs {(individualAmount || 0).toFixed(2)}</Text>
                   </View>
                 </View>
               );
@@ -196,7 +196,7 @@ export default function GroupTransactionDetailScreen() {
                   <Text style={styles.memberName}>You</Text>
                 </View>
                 <View style={styles.memberAmount}>
-                  <Text style={styles.memberAmountText}>₹{(transaction.userAmount || 0).toFixed(2)}</Text>
+                  <Text style={styles.memberAmountText}>Rs {(transaction.userAmount || 0).toFixed(2)}</Text>
                 </View>
               </View>
             )}
@@ -214,12 +214,12 @@ export default function GroupTransactionDetailScreen() {
             <>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Your Share:</Text>
-                <Text style={styles.summaryValue}>₹{transaction.userAmount || 0}</Text>
+                <Text style={styles.summaryValue}>Rs {transaction.userAmount || 0}</Text>
               </View>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Contacts Total:</Text>
                 <Text style={styles.summaryValue}>
-                  ₹{transaction.individualAmounts ? 
+                  Rs {transaction.individualAmounts ? 
                     Object.values(transaction.individualAmounts).reduce((sum, amount) => sum + amount, 0) : 
                     0}
                 </Text>
@@ -228,17 +228,17 @@ export default function GroupTransactionDetailScreen() {
           ) : (
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Per Person Share:</Text>
-              <Text style={styles.summaryValue}>₹{transaction.perPersonShare}</Text>
+              <Text style={styles.summaryValue}>Rs {transaction.perPersonShare}</Text>
             </View>
           )}
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Total Amount:</Text>
-            <Text style={styles.summaryValue}>₹{transaction.totalAmount}</Text>
+            <Text style={styles.summaryValue}>Rs {transaction.totalAmount}</Text>
           </View>
           <View style={styles.summaryDivider} />
           <View style={styles.summaryRow}>
             <Text style={styles.summaryTotalLabel}>Amount Paid:</Text>
-            <Text style={styles.summaryTotalValue}>₹{transaction.totalAmount}</Text>
+            <Text style={styles.summaryTotalValue}>Rs {transaction.totalAmount}</Text>
           </View>
         </View>
       </View>
