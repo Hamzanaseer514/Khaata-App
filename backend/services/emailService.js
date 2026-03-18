@@ -314,5 +314,60 @@ const sendAppUpdateEmail = async (recipientEmail, data) => {
   }
 };
 
-module.exports.sendAppUpdateEmail = sendAppUpdateEmail;
-module.exports.getAppUpdateTemplate = getAppUpdateTemplate;
+
+// ===== Forgot Password template =====
+
+const getForgotPasswordTemplate = ({ name, code }) => {
+  const brandPrimary = '#20B2AA';
+  const html = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>Reset your password – Khaata</title>
+      <style>
+        body { background:#f5f7fb; margin:0; padding:24px; font-family:Arial, Helvetica, sans-serif; color:#111827; }
+        .wrap { max-width:640px; margin:0 auto; }
+        .brand { text-align:center; font-weight:800; color:${brandPrimary}; font-size:22px; margin-bottom:12px; }
+        .card { background:#ffffff; border-radius:14px; box-shadow:0 10px 30px rgba(16,24,40,.08); border:1px solid #eef2f7; overflow:hidden; }
+        .header { padding:18px 22px; border-bottom:1px solid #eef2f7; background:linear-gradient(135deg, #ffffff, #f9fbff); }
+        .title { margin:0; font-size:18px; font-weight:800; color:#0f172a; }
+        .body { padding:24px 22px; }
+        .lead { margin:8px 0 18px; color:#475569; line-height:1.5; }
+        .code { display:inline-block; font-size:32px; letter-spacing:8px; font-weight:900; padding:16px 24px; border-radius:12px; background:#f1faf9; color:#0b7d79; border:2px dashed ${brandPrimary}; margin:12px 0; }
+        .meta { margin-top:10px; color:#64748b; font-size:13px; }
+        .footer { text-align:center; color:#94a3b8; font-size:12px; padding:16px 0 6px; }
+      </style>
+    </head>
+    <body>
+      <div class="wrap">
+        <div class="brand">Khaata</div>
+        <div class="card">
+          <div class="header"><h1 class="title">Reset your password</h1></div>
+          <div class="body">
+            <p class="lead">Hi ${name || 'there'}, we received a request to reset your password. Use the following code to continue. The code expires in <b>10 minutes</b>.</p>
+            <div style="text-align:center;"><span class="code">${code}</span></div>
+            <p class="meta">If you didn't request a password reset, you can safely ignore this email.</p>
+          </div>
+          <div class="footer">© ${new Date().getFullYear()} Khaata. All rights reserved.</div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  return {
+    subject: 'Reset your Khaata password',
+    html,
+    text: `Your password reset code is: ${code}. It expires in 10 minutes.`
+  };
+};
+
+module.exports = {
+  sendNotificationEmail,
+  getEmailTemplate,
+  sendAppUpdateEmail,
+  getAppUpdateTemplate,
+  getForgotPasswordTemplate
+};

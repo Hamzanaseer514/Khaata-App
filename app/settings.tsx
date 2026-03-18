@@ -1,4 +1,6 @@
 import config from '@/config/config';
+import BottomNav from '@/components/BottomNav';
+import { useTheme } from '@/contexts/DarkModeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   getBiometricPreference,
@@ -24,6 +26,7 @@ import {
 
 export default function SettingsScreen() {
   const { user, logout, token } = useAuth();
+  const { setThemeMode, isDarkMode } = useTheme();
   const [isLoading, setIsLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -31,7 +34,6 @@ export default function SettingsScreen() {
   const slideAnim = useRef(new Animated.Value(50)).current;
 
   // Settings states
-  const [darkMode, setDarkMode] = useState(false);
   const [currency, setCurrency] = useState('Rs');
   const [language, setLanguage] = useState('English');
   const [biometricAuth, setBiometricAuth] = useState(false);
@@ -358,9 +360,9 @@ export default function SettingsScreen() {
           <View style={styles.settingsGroup}>
             <SettingItem
               title="Dark Mode"
-              subtitle="Switch to dark theme"
-              icon="🌙"
-              rightComponent={<SwitchComponent value={darkMode} onValueChange={setDarkMode} />}
+              subtitle={isDarkMode ? "Switch to light theme" : "Switch to dark theme"}
+              icon={isDarkMode ? "☀️" : "🌙"}
+              rightComponent={<SwitchComponent value={isDarkMode} onValueChange={(val) => setThemeMode(val ? 'dark' : 'light')} />}
             />
             <SettingItem
               title="Currency"
@@ -497,6 +499,7 @@ export default function SettingsScreen() {
           </View>
         </View>
       </Modal>
+      <BottomNav />
     </View>
   );
 }
@@ -538,6 +541,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 20,
+    paddingBottom: 100, // Extra padding for BottomNav
   },
   section: {
     marginBottom: 30,

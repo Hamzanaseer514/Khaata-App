@@ -12,6 +12,7 @@ import {
     View,
 } from 'react-native';
 import config from '../config/config';
+import BottomNav from '@/components/BottomNav';
 
 interface Notification {
   id: string;
@@ -251,6 +252,7 @@ export default function NotificationsScreen() {
           ListEmptyComponent={renderEmptyState}
         />
       </View>
+      <BottomNav />
     </View>
   );
 }
@@ -333,6 +335,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: 20,
+    paddingBottom: 100,
   },
   notificationCard: {
     backgroundColor: 'white',

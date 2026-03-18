@@ -4,6 +4,8 @@ const { body, validationResult } = require('express-validator');
 const Transaction = require('../models/Transaction');
 const Contact = require('../models/Contact');
 const { createTransactionNotification } = require('../services/notificationService');
+const User = require('../models/User');
+const RewardRecord = require('../models/RewardRecord');
 
 const router = express.Router();
 
@@ -68,9 +70,9 @@ router.post('/', [
     const { contactId, amount, payer, note } = req.body;
 
     // Verify that the contact belongs to the user
-    const contact = await Contact.findOne({ 
-      _id: contactId, 
-      userId: req.user.userId 
+    const contact = await Contact.findOne({
+      _id: contactId,
+      userId: req.user.userId
     });
 
     if (!contact) {
@@ -101,6 +103,55 @@ router.post('/', [
     }
 
     await contact.save();
+
+    // --- Reward System Logic ---
+    try {
+      const user = await User.findById(req.user.userId);
+      if (user) {
+        let earnedPoints = 5; // Base points for a transaction
+        let rewardReason = 'New Transaction';
+
+        // Check Daily Milestone (5 transactions)
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const lastReset = new Date(user.dailyTransactionCount.lastReset);
+        lastReset.setHours(0, 0, 0, 0);
+
+        if (today > lastReset) {
+          // Reset for a new day
+          user.dailyTransactionCount.count = 1;
+          user.dailyTransactionCount.lastReset = new Date();
+        } else {
+          user.dailyTransactionCount.count += 1;
+        }
+
+        // Award milestone if exactly 5
+        if (user.dailyTransactionCount.count === 5) {
+          earnedPoints += 50;
+          rewardReason = 'Daily Transaction Milestone (5)';
+        }
+
+        user.points += earnedPoints;
+
+        // Simple Leveling logic
+        if (user.points >= 1000) user.level = 'Platinum';
+        else if (user.points >= 400) user.level = 'Gold';
+
+        await user.save();
+
+        // Log reward record
+        const reward = new RewardRecord({
+          userId: req.user.userId,
+          points: earnedPoints,
+          reason: rewardReason
+        });
+        await reward.save();
+      }
+    } catch (rewardError) {
+      console.error('Reward award error:', rewardError);
+    }
+    // ----------------------------
 
     // Send notification email (async, don't wait for it)
     createTransactionNotification(transaction, req.user.userId, contactId)
@@ -135,6 +186,64 @@ router.post('/', [
   }
 });
 
+// GET /api/transactions/summary/monthly - Monthly aggregation for dashboard
+router.get('/summary/monthly', authenticateToken, async (req, res) => {
+  try {
+    const userId = new mongoose.Types.ObjectId(req.user.userId);
+
+    // Last 6 months range
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    sixMonthsAgo.setHours(0, 0, 0, 0);
+
+    const stats = await Transaction.aggregate([
+      {
+        $match: {
+          userId: userId,
+          createdAt: { $gte: sixMonthsAgo }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: "$createdAt" },
+            month: { $month: "$createdAt" }
+          },
+          userPaid: {
+            $sum: { $cond: [{ $eq: ["$payer", "USER"] }, "$amount", 0] }
+          },
+          friendPaid: {
+            $sum: { $cond: [{ $eq: ["$payer", "FRIEND"] }, "$amount", 0] }
+          }
+        }
+      },
+      {
+        $addFields: {
+          net: { $subtract: ["$userPaid", "$friendPaid"] }
+        }
+      },
+      { $sort: { "_id.year": 1, "_id.month": 1 } }
+    ]);
+
+    // Format for frontend: { label: 'Jan', userPaid: 100, friendPaid: 50, net: 50 }
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const formattedData = stats.map(s => ({
+      label: months[s._id.month - 1],
+      userPaid: s.userPaid,
+      friendPaid: s.friendPaid,
+      net: s.net
+    }));
+
+    res.json({
+      success: true,
+      data: formattedData
+    });
+  } catch (error) {
+    console.error('Monthly summary error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
 // GET /api/transactions - Get transactions for a specific contact or all contacts
 router.get('/', authenticateToken, async (req, res) => {
   try {
@@ -146,9 +255,9 @@ router.get('/', authenticateToken, async (req, res) => {
     // If contact_id is provided, filter by contact
     if (contact_id) {
       // Verify that the contact belongs to the user
-      const contact = await Contact.findOne({ 
-        _id: contact_id, 
-        userId 
+      const contact = await Contact.findOne({
+        _id: contact_id,
+        userId
       });
 
       if (!contact) {
@@ -191,57 +300,138 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-// GET /api/transactions/summary/monthly - Monthly totals for bar chart
-router.get('/summary/monthly', authenticateToken, async (req, res) => {
+// PUT /api/transactions/:id - Update an existing transaction
+router.put('/:id', [
+  authenticateToken,
+  body('amount')
+    .optional()
+    .isFloat({ min: 0.01 })
+    .withMessage('Amount must be a positive number greater than 0'),
+  body('payer')
+    .optional()
+    .isIn(['USER', 'FRIEND'])
+    .withMessage('Payer must be either USER or FRIEND'),
+  body('note')
+    .optional()
+    .trim()
+    .isLength({ max: 200 })
+    .withMessage('Note cannot exceed 200 characters')
+], async (req, res) => {
   try {
-    const userId = req.user.userId;
-    const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth() - 5, 1); // last 6 months including current
+    const transactionId = req.params.id;
+    const { amount, payer, note } = req.body;
 
-    const results = await Transaction.aggregate([
-      { $match: { userId: new (require('mongoose')).Types.ObjectId(userId), createdAt: { $gte: start } } },
-      {
-        $group: {
-          _id: { y: { $year: '$createdAt' }, m: { $month: '$createdAt' }, payer: '$payer' },
-          total: { $sum: '$amount' },
-          txCount: { $sum: 1 },
-        },
-      },
-      { $sort: { '_id.y': 1, '_id.m': 1 } },
-    ]);
-
-    // Shape: month label, userPaid, friendPaid, net (userPaid - friendPaid)
-    const map = new Map();
-    results.forEach((r) => {
-      const key = `${r._id.y}-${r._id.m}`;
-      if (!map.has(key)) map.set(key, { year: r._id.y, month: r._id.m, userPaid: 0, friendPaid: 0, userCount: 0, friendCount: 0 });
-      const row = map.get(key);
-      if (r._id.payer === 'USER') { row.userPaid += r.total; row.userCount += r.txCount; }
-      else { row.friendPaid += r.total; row.friendCount += r.txCount; }
+    // Find the transaction and verify ownership
+    const transaction = await Transaction.findOne({
+      _id: transactionId,
+      userId: req.user.userId
     });
 
-    // Ensure chronological sequence for last 6 months
-    const out = [];
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const k = `${d.getFullYear()}-${d.getMonth() + 1}`;
-      const row = map.get(k) || { year: d.getFullYear(), month: d.getMonth() + 1, userPaid: 0, friendPaid: 0 };
-      out.push({
-        year: row.year,
-        month: row.month,
-        label: d.toLocaleString('default', { month: 'short' }),
-        userPaid: row.userPaid,
-        friendPaid: row.friendPaid,
-        userCount: row.userCount || 0,
-        friendCount: row.friendCount || 0,
-        net: row.userPaid - row.friendPaid,
+    if (!transaction) {
+      return res.status(404).json({
+        success: false,
+        message: 'Transaction not found or access denied'
       });
     }
 
-    res.json({ success: true, message: 'Monthly summary', data: out });
+    const contact = await Contact.findById(transaction.contactId);
+    if (!contact) {
+      return res.status(404).json({
+        success: false,
+        message: 'Associated contact not found'
+      });
+    }
+
+    // 1. Revert previous balance impact
+    if (transaction.payer === 'USER') {
+      contact.balance -= transaction.amount;
+    } else {
+      contact.balance += transaction.amount;
+    }
+
+    // 2. Update transaction fields
+    if (amount !== undefined) transaction.amount = amount;
+    if (payer !== undefined) transaction.payer = payer;
+    if (note !== undefined) transaction.note = note;
+
+    // 3. Apply new balance impact
+    if (transaction.payer === 'USER') {
+      contact.balance += transaction.amount;
+    } else {
+      contact.balance -= transaction.amount;
+    }
+
+    await transaction.save();
+    await contact.save();
+
+    res.json({
+      success: true,
+      message: 'Transaction updated successfully',
+      data: {
+        id: transaction._id,
+        amount: transaction.amount,
+        payer: transaction.payer,
+        note: transaction.note,
+        newBalance: contact.balance
+      }
+    });
+
   } catch (error) {
-    console.error('Monthly summary error:', error);
-    res.status(500).json({ success: false, message: 'Internal server error', error: error.message });
+    console.error('Update transaction error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
+// DELETE /api/transactions/:id - Delete a transaction
+router.delete('/:id', authenticateToken, async (req, res) => {
+  try {
+    const transactionId = req.params.id;
+
+    // Find the transaction and verify ownership
+    const transaction = await Transaction.findOne({
+      _id: transactionId,
+      userId: req.user.userId
+    });
+
+    if (!transaction) {
+      return res.status(404).json({
+        success: false,
+        message: 'Transaction not found or access denied'
+      });
+    }
+
+    const contact = await Contact.findById(transaction.contactId);
+    if (contact) {
+      // Revert balance impact
+      if (transaction.payer === 'USER') {
+        contact.balance -= transaction.amount;
+      } else {
+        contact.balance += transaction.amount;
+      }
+      await contact.save();
+    }
+
+    await Transaction.deleteOne({ _id: transactionId });
+
+    res.json({
+      success: true,
+      message: 'Transaction deleted successfully',
+      data: {
+        newBalance: contact ? contact.balance : null
+      }
+    });
+
+  } catch (error) {
+    console.error('Delete transaction error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
   }
 });
 

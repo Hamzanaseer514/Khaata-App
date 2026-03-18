@@ -1,9 +1,12 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const { body, validationResult } = require('express-validator');
 const Contact = require('../models/Contact');
 const Transaction = require('../models/Transaction');
 const GroupTransaction = require('../models/GroupTransaction');
+const User = require('../models/User');
+const RewardRecord = require('../models/RewardRecord');
 
 const router = express.Router();
 
@@ -37,9 +40,34 @@ const authenticateToken = (req, res, next) => {
 // GET /api/contacts - Get all contacts for logged-in user
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const contacts = await Contact.find({ userId: req.user.userId })
-      .sort({ createdAt: -1 })
-      .select('-userId');
+    const contacts = await Contact.aggregate([
+      { $match: { userId: new mongoose.Types.ObjectId(req.user.userId) } },
+      {
+        $lookup: {
+          from: 'transactions', // Ensure this matches your collection name
+          let: { contactId: '$_id' },
+          pipeline: [
+            { $match: { $expr: { $eq: ['$contactId', '$$contactId'] } } },
+            { $sort: { date: -1 } },
+            { $limit: 1 },
+            { $project: { date: 1 } }
+          ],
+          as: 'lastTransaction'
+        }
+      },
+      {
+        $addFields: {
+          lastTransactionDate: { $arrayElemAt: ['$lastTransaction.date', 0] }
+        }
+      },
+      {
+        $project: {
+          lastTransaction: 0,
+          userId: 0
+        }
+      },
+      { $sort: { updatedAt: -1 } } // Keep recently updated contacts at top
+    ]);
 
     res.json({
       success: true,
@@ -115,7 +143,7 @@ router.post('/', [
       });
     }
 
-    const { name, email, phone } = req.body;
+    const { name, email, phone, profilePicture } = req.body;
 
     // Check if contact with same phone already exists for this user
     const existingContact = await Contact.findOne({ 
@@ -135,10 +163,37 @@ router.post('/', [
       userId: req.user.userId,
       name,
       email,
-      phone
+      phone,
+      profilePicture
     });
 
     await contact.save();
+
+    // --- Reward System Logic ---
+    try {
+      const user = await User.findById(req.user.userId);
+      if (user) {
+        const earnedPoints = 10; // Points for a new contact
+        user.points += earnedPoints;
+        
+        // Simple Leveling logic
+        if (user.points >= 1000) user.level = 'Platinum';
+        else if (user.points >= 400) user.level = 'Gold';
+        
+        await user.save();
+        
+        // Log reward record
+        const reward = new RewardRecord({
+          userId: req.user.userId,
+          points: earnedPoints,
+          reason: 'New Contact Added'
+        });
+        await reward.save();
+      }
+    } catch (rewardError) {
+      console.error('Reward award error:', rewardError);
+    }
+    // ----------------------------
 
     res.status(201).json({
       success: true,
@@ -148,6 +203,7 @@ router.post('/', [
         name: contact.name,
         email: contact.email,
         phone: contact.phone,
+        profilePicture: contact.profilePicture,
         balance: contact.balance,
         createdAt: contact.createdAt
       }
@@ -244,10 +300,11 @@ router.put('/:id', [
     }
 
     // Update contact fields
-    const { name, email, phone } = req.body;
+    const { name, email, phone, profilePicture } = req.body;
     if (name && name.trim()) contact.name = name.trim();
     if (email !== undefined) contact.email = email === '' ? undefined : email;
     if (phone && phone.trim()) contact.phone = phone.trim();
+    if (profilePicture !== undefined) contact.profilePicture = profilePicture;
 
     await contact.save();
 
@@ -259,6 +316,7 @@ router.put('/:id', [
         name: contact.name,
         email: contact.email,
         phone: contact.phone,
+        profilePicture: contact.profilePicture,
         balance: contact.balance,
         createdAt: contact.createdAt
       }

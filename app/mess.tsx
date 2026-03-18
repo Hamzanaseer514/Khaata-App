@@ -1,3 +1,4 @@
+import BottomNav from '@/components/BottomNav';
 import config from '@/config/config';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -39,7 +40,7 @@ export default function MessScreen() {
   const [records, setRecords] = useState<MessRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   // Form state
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [mealType, setMealType] = useState<'Breakfast' | 'Lunch' | 'Dinner'>('Breakfast');
@@ -47,13 +48,13 @@ export default function MessScreen() {
   const [personCount, setPersonCount] = useState('1');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
-  
+
   // Year and Month filter state
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
   const [showYearDropdown, setShowYearDropdown] = useState(false);
   const [showMonthDropdown, setShowMonthDropdown] = useState(false);
-  
+
 
 
 
@@ -75,10 +76,10 @@ export default function MessScreen() {
       console.log('Missing user or token:', { userId: user?.id, token: token ? 'Present' : 'Missing' });
       return;
     }
-    
+
     console.log('Loading records for user:', user.id);
     console.log('API URL:', `${config.BASE_URL}/mess/user/${user.id}`);
-    
+
     setIsLoading(true);
     try {
       const response = await fetch(`${config.BASE_URL}/mess/user/${user.id}`, {
@@ -103,7 +104,7 @@ export default function MessScreen() {
 
       const data = await response.json();
       console.log('Records success response:', data);
-      
+
       if (data.success) {
         const loadedRecords = data.data.records || [];
         setRecords(loadedRecords);
@@ -137,7 +138,7 @@ export default function MessScreen() {
       showError('Authentication required. Please login again.');
       return;
     }
-    
+
     if (!selectedDate || !mealType || !price) {
       showError('Please fill in all fields');
       return;
@@ -187,7 +188,7 @@ export default function MessScreen() {
       // Clone response to read as text if JSON parsing fails
       const responseClone = response.clone();
       let responseData;
-      
+
       try {
         responseData = await response.json();
         console.log('Response data:', responseData);
@@ -210,7 +211,7 @@ export default function MessScreen() {
         showError(errorMessage);
         return;
       }
-      
+
       if (responseData.success) {
         showSuccess('Record added successfully!');
         setPrice('');
@@ -256,7 +257,7 @@ export default function MessScreen() {
   const renderRecord = ({ item }: { item: MessRecord }) => {
     const mealEmoji = mealTypes.find(m => m.value === item.mealType)?.emoji || '🍽️';
     const personCountValue = item.personCount || 1;
-    
+
     return (
       <View style={styles.recordCard}>
         <View style={styles.recordHeader}>
@@ -302,7 +303,7 @@ export default function MessScreen() {
       }
 
       const data = await response.json();
-      
+
       if (data.success) {
         showSuccess('Record deleted successfully!');
         loadRecords();
@@ -348,14 +349,14 @@ export default function MessScreen() {
 
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.backButton}
             onPress={() => router.back()}
           >
@@ -370,22 +371,21 @@ export default function MessScreen() {
         {/* Records List */}
         <View style={styles.recordsSection}>
           {/* <Text style={styles.recordsTitle}>Recent Records</Text> */}
-          
-          {/* Year and Month Filter Dropdown */}
+
           {records.length > 0 && (() => {
             // Get unique years from records data
             const uniqueYears = [...new Set(records.map(r => new Date(r.date).getFullYear()))].sort((a, b) => b - a);
-            
+
             // Get unique months for selected year
             const recordsForYear = records.filter(r => new Date(r.date).getFullYear() === selectedYear);
             const uniqueMonths = [...new Set(recordsForYear.map(r => new Date(r.date).getMonth() + 1))].sort((a, b) => b - a);
-            
+
             // Filter records by selected year and month
             const filteredRecords = records.filter(r => {
               const recordDate = new Date(r.date);
               return recordDate.getFullYear() === selectedYear && recordDate.getMonth() + 1 === selectedMonth;
             });
-            
+
             return (
               <>
                 <View style={styles.filterContainer}>
@@ -401,7 +401,7 @@ export default function MessScreen() {
                         <Text style={styles.yearDropdownText}>{selectedYear}</Text>
                         <Text style={styles.yearDropdownArrow}>▼</Text>
                       </TouchableOpacity>
-                      
+
                       {/* Year Dropdown Modal */}
                       <Modal
                         visible={showYearDropdown}
@@ -468,7 +468,7 @@ export default function MessScreen() {
                           <Text style={styles.yearDropdownText}>{monthNames[selectedMonth - 1]}</Text>
                           <Text style={styles.yearDropdownArrow}>▼</Text>
                         </TouchableOpacity>
-                        
+
                         {/* Month Dropdown Modal */}
                         <Modal
                           visible={showMonthDropdown}
@@ -521,30 +521,30 @@ export default function MessScreen() {
                   </View>
                 </View>
 
-          {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#20B2AA" />
-              <Text style={styles.loadingText}>Loading records...</Text>
-            </View>
+                {isLoading ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#20B2AA" />
+                    <Text style={styles.loadingText}>Loading records...</Text>
+                  </View>
                 ) : filteredRecords.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyEmoji}>🍽️</Text>
+                  <View style={styles.emptyContainer}>
+                    <Text style={styles.emptyEmoji}>🍽️</Text>
                     <Text style={styles.emptyText}>No records found for {monthNames[selectedMonth - 1]} {selectedYear}</Text>
-              <Text style={styles.emptySubtext}>Add your first meal record above</Text>
-            </View>
-          ) : (
-            <FlatList
+                    <Text style={styles.emptySubtext}>Add your first meal record above</Text>
+                  </View>
+                ) : (
+                  <FlatList
                     data={filteredRecords}
-              renderItem={renderRecord}
-              keyExtractor={(item) => item.id}
-              showsVerticalScrollIndicator={false}
-              scrollEnabled={false}
-            />
-          )}
+                    renderItem={renderRecord}
+                    keyExtractor={(item) => item.id}
+                    showsVerticalScrollIndicator={false}
+                    scrollEnabled={false}
+                  />
+                )}
               </>
             );
           })()}
-          
+
           {records.length === 0 && !isLoading && (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyEmoji}>🍽️</Text>
@@ -552,7 +552,7 @@ export default function MessScreen() {
               <Text style={styles.emptySubtext}>Add your first meal record above</Text>
             </View>
           )}
-          
+
           {isLoading && records.length === 0 && (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#20B2AA" />
@@ -571,7 +571,7 @@ export default function MessScreen() {
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>Select Date</Text>
-              
+
               <View style={styles.datePickerContainer}>
                 {/* Year Selector */}
                 <View style={styles.dateSection}>
@@ -705,6 +705,7 @@ export default function MessScreen() {
           onSubmit={handleAddRecord}
         />
       )}
+      <BottomNav />
     </KeyboardAvoidingView>
   );
 }
@@ -756,7 +757,7 @@ function AddRecordModal({
 
   return (
     <Modal visible={true} transparent={true} animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         style={styles.modalOverlayCompact}
@@ -769,98 +770,98 @@ function AddRecordModal({
           <View style={styles.modalContainerCompact} onStartShouldSetResponder={() => true}>
             <View style={styles.modalHeaderCompact}>
               <Text style={styles.modalTitleCompact}>Add Record</Text>
-            <TouchableOpacity onPress={onClose}>
-              <Text style={styles.modalCloseButton}>✕</Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView 
-            style={styles.modalContentCompact}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            {/* Date Input */}
-            <View style={styles.inputContainerCompact}>
-              <Text style={styles.labelCompact}>📅 Date</Text>
-              <TouchableOpacity
-                style={styles.dateInputCompact}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <Text style={styles.dateInputTextCompact}>
-                  {selectedDate.toLocaleDateString('en-US', {
-                    weekday: 'short',
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                  })}
-                </Text>
-                <Text style={styles.dateInputIconCompact}>📅</Text>
+              <TouchableOpacity onPress={onClose}>
+                <Text style={styles.modalCloseButton}>✕</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Meal Type Selector */}
-            <View style={styles.inputContainerCompact}>
-              <Text style={styles.labelCompact}>Meal Type *</Text>
-              <View style={styles.mealTypeButtonsCompact}>
-                {mealTypes.map((type) => (
-                  <TouchableOpacity
-                    key={type.value}
-                    style={[
-                      styles.mealTypeButtonCompact,
-                      mealType === type.value && styles.mealTypeButtonActiveCompact
-                    ]}
-                    onPress={() => setMealType(type.value)}
-                  >
-                    <Text style={[
-                      styles.mealTypeButtonTextCompact,
-                      mealType === type.value && styles.mealTypeButtonTextActiveCompact
-                    ]}>
-                      {type.emoji} {type.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            {/* Price Input */}
-            <View style={styles.inputContainerCompact}>
-              <Text style={styles.labelCompact}>💰 Price (per person) *</Text>
-              <TextInput
-                style={styles.inputCompact}
-                value={price}
-                onChangeText={setPrice}
-                placeholder="Enter meal price per person"
-                placeholderTextColor={placeholderColor}
-                keyboardType="numeric"
-              />
-            </View>
-
-            {/* Person Count Input */}
-            <View style={styles.inputContainerCompact}>
-              <Text style={styles.labelCompact}>👥 Person</Text>
-              <TextInput
-                style={styles.inputCompact}
-                value={personCount}
-                onChangeText={setPersonCount}
-                placeholder="Enter number of persons (default: 1)"
-                placeholderTextColor={placeholderColor}
-                keyboardType="numeric"
-              />
-            </View>
-
-            {/* Submit Button */}
-            <TouchableOpacity
-              style={[styles.submitButtonCompact, isSubmitting && styles.submitButtonDisabled]}
-              onPress={onSubmit}
-              disabled={isSubmitting}
+            <ScrollView
+              style={styles.modalContentCompact}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
             >
-              {isSubmitting ? (
-                <ActivityIndicator color="white" />
-              ) : (
-                <Text style={styles.submitButtonTextCompact}>Add Record</Text>
-              )}
-            </TouchableOpacity>
-          </ScrollView>
+              {/* Date Input */}
+              <View style={styles.inputContainerCompact}>
+                <Text style={styles.labelCompact}>📅 Date</Text>
+                <TouchableOpacity
+                  style={styles.dateInputCompact}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Text style={styles.dateInputTextCompact}>
+                    {selectedDate.toLocaleDateString('en-US', {
+                      weekday: 'short',
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                  </Text>
+                  <Text style={styles.dateInputIconCompact}>📅</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Meal Type Selector */}
+              <View style={styles.inputContainerCompact}>
+                <Text style={styles.labelCompact}>Meal Type *</Text>
+                <View style={styles.mealTypeButtonsCompact}>
+                  {mealTypes.map((type) => (
+                    <TouchableOpacity
+                      key={type.value}
+                      style={[
+                        styles.mealTypeButtonCompact,
+                        mealType === type.value && styles.mealTypeButtonActiveCompact
+                      ]}
+                      onPress={() => setMealType(type.value)}
+                    >
+                      <Text style={[
+                        styles.mealTypeButtonTextCompact,
+                        mealType === type.value && styles.mealTypeButtonTextActiveCompact
+                      ]}>
+                        {type.emoji} {type.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Price Input */}
+              <View style={styles.inputContainerCompact}>
+                <Text style={styles.labelCompact}>💰 Price (per person) *</Text>
+                <TextInput
+                  style={styles.inputCompact}
+                  value={price}
+                  onChangeText={setPrice}
+                  placeholder="Enter meal price per person"
+                  placeholderTextColor={placeholderColor}
+                  keyboardType="numeric"
+                />
+              </View>
+
+              {/* Person Count Input */}
+              <View style={styles.inputContainerCompact}>
+                <Text style={styles.labelCompact}>👥 Person</Text>
+                <TextInput
+                  style={styles.inputCompact}
+                  value={personCount}
+                  onChangeText={setPersonCount}
+                  placeholder="Enter number of persons (default: 1)"
+                  placeholderTextColor={placeholderColor}
+                  keyboardType="numeric"
+                />
+              </View>
+
+              {/* Submit Button */}
+              <TouchableOpacity
+                style={[styles.submitButtonCompact, isSubmitting && styles.submitButtonDisabled]}
+                onPress={onSubmit}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text style={styles.submitButtonTextCompact}>Add Record</Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </TouchableOpacity>
       </KeyboardAvoidingView>
@@ -875,6 +876,7 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    paddingBottom: 100, // Extra padding for BottomNav
   },
   header: {
     backgroundColor: '#20B2AA',

@@ -1,4 +1,5 @@
 import config from '@/config/config';
+import BottomNav from '@/components/BottomNav';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { showError, showSuccess } from '@/utils/toast';
@@ -596,6 +597,7 @@ export default function PersonalKhaataScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+      <BottomNav />
     </View>
   );
 }
@@ -1626,7 +1628,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   listContainer: {
-    paddingBottom: 80,
+    padding: 16,
+    paddingBottom: 160, // Space for BottomNav and floating button
   },
   transactionCard: {
     backgroundColor: 'white',

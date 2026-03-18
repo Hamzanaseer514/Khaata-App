@@ -3,14 +3,14 @@ import { showError } from '@/utils/toast';
 import { router } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import {
-    Animated,
-    Linking,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Animated,
+  Linking,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 export default function ContactSupportScreen() {
@@ -62,7 +62,7 @@ export default function ContactSupportScreen() {
       showError('Please enter your message before sending.');
       return;
     }
-    
+
     // For simplicity, default to email; UI can add buttons for choices
     handleEmail();
   };
@@ -70,7 +70,7 @@ export default function ContactSupportScreen() {
   return (
     <ScrollView style={styles.container}>
       {/* Header */}
-      <Animated.View 
+      <Animated.View
         style={[
           styles.header,
           {
@@ -86,7 +86,7 @@ export default function ContactSupportScreen() {
         <View style={styles.headerSpacer} />
       </Animated.View>
 
-      <Animated.View 
+      <Animated.View
         style={[
           styles.content,
           {
@@ -106,7 +106,7 @@ export default function ContactSupportScreen() {
         {/* Contact Methods */}
         <View style={styles.contactSection}>
           <Text style={styles.sectionTitle}>Contact Methods</Text>
-          
+
           <TouchableOpacity style={styles.contactMethod} onPress={handleWhatsApp}>
             <View style={styles.contactIconContainer}>
               <Text style={styles.contactIcon}>📱</Text>
@@ -147,7 +147,7 @@ export default function ContactSupportScreen() {
           <Text style={styles.sectionText}>
             Describe your issue or question below, and we'll help you resolve it quickly.
           </Text>
-          
+
           <View style={styles.messageContainer}>
             <TextInput
               style={styles.messageInput}
@@ -159,7 +159,7 @@ export default function ContactSupportScreen() {
               numberOfLines={6}
               textAlignVertical="top"
             />
-            
+
             <TouchableOpacity style={styles.sendButton} onPress={handleSubmitMessage}>
               <Text style={styles.sendButtonText}>Send Message</Text>
             </TouchableOpacity>
@@ -169,7 +169,7 @@ export default function ContactSupportScreen() {
         {/* FAQ Section */}
         <View style={styles.faqSection}>
           <Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
-          
+
           <View style={styles.faqItem}>
             <Text style={styles.faqQuestion}>How do I reset my password?</Text>
             <Text style={styles.faqAnswer}>

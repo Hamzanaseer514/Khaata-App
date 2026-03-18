@@ -1,3 +1,4 @@
+import BottomNav from '@/components/BottomNav';
 import config from '@/config/config';
 import { useAuth } from '@/contexts/AuthContext';
 import { router } from 'expo-router';
@@ -59,7 +60,7 @@ export default function MessAnalyticsScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [showYearDropdown, setShowYearDropdown] = useState(false);
-  
+
   // Date range state
   const [startDate, setStartDate] = useState(new Date());
   const [endDate, setEndDate] = useState(new Date());
@@ -134,7 +135,7 @@ export default function MessAnalyticsScreen() {
     if (!user?.id || !token) {
       return;
     }
-    
+
     setIsLoading(true);
     try {
       const response = await fetch(
@@ -162,7 +163,7 @@ export default function MessAnalyticsScreen() {
       }
 
       const data = await response.json();
-      
+
       if (data.success) {
         setMonthlySummary(data.data.summary);
         setAnalytics(data.data.analytics);
@@ -261,220 +262,223 @@ export default function MessAnalyticsScreen() {
   ];
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Text style={styles.backButtonText}>← Back</Text>
-        </TouchableOpacity>
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>📊 Mess Analytics</Text>
-          <Text style={styles.headerSubtitle}>Detailed insights & reports</Text>
+    <View style={{ flex: 1 }}>
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backButtonText}>← Back</Text>
+          </TouchableOpacity>
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>📊 Mess Analytics</Text>
+            <Text style={styles.headerSubtitle}>Detailed insights & reports</Text>
+          </View>
         </View>
-      </View>
 
-      {/* Months with data - tap to open analytics for that month */}
-      {months.length > 0 && (() => {
-        // Get unique years from months data
-        const uniqueYears = [...new Set(months.map(m => m.year))].sort((a, b) => b - a);
-        
-        // Filter months by selected year
-        const filteredMonths = months.filter(m => m.year === selectedYear);
-        
-        return (
-          <View style={styles.summaryCard}>
-            <Text style={[styles.summaryTitle, { textAlign: 'center', marginBottom: 15 }]}>📆 Months with data</Text>
-            
-            {/* Year Filter Dropdown */}
-            <View style={styles.yearFilterContainer}>
-              <Text style={styles.yearFilterLabel}>Filter by Year:</Text>
-              <TouchableOpacity
-                style={styles.yearDropdown}
-                onPress={() => setShowYearDropdown(true)}
-              >
-                <Text style={styles.yearDropdownText}>{selectedYear}</Text>
-                <Text style={styles.yearDropdownArrow}>▼</Text>
-              </TouchableOpacity>
-              
-              {/* Year Dropdown Modal */}
-              <Modal
-                visible={showYearDropdown}
-                transparent={true}
-                animationType="fade"
-                onRequestClose={() => setShowYearDropdown(false)}
-              >
+        {/* Months with data - tap to open analytics for that month */}
+        {months.length > 0 && (() => {
+          // Get unique years from months data
+          const uniqueYears = [...new Set(months.map(m => m.year))].sort((a, b) => b - a);
+
+          // Filter months by selected year
+          const filteredMonths = months.filter(m => m.year === selectedYear);
+
+          return (
+            <View style={styles.summaryCard}>
+              <Text style={[styles.summaryTitle, { textAlign: 'center', marginBottom: 15 }]}>📆 Months with data</Text>
+
+              {/* Year Filter Dropdown */}
+              <View style={styles.yearFilterContainer}>
+                <Text style={styles.yearFilterLabel}>Filter by Year:</Text>
                 <TouchableOpacity
-                  style={styles.modalOverlay}
-                  activeOpacity={1}
-                  onPress={() => setShowYearDropdown(false)}
+                  style={styles.yearDropdown}
+                  onPress={() => setShowYearDropdown(true)}
                 >
-                  <View style={styles.dropdownContainer} onStartShouldSetResponder={() => true}>
-                    <View style={styles.dropdownHeader}>
-                      <Text style={styles.dropdownTitle}>Select Year</Text>
-                      <TouchableOpacity onPress={() => setShowYearDropdown(false)}>
-                        <Text style={styles.dropdownClose}>✕</Text>
-                      </TouchableOpacity>
-                    </View>
-                    <ScrollView style={styles.dropdownScroll}>
-                      {uniqueYears.map((year) => (
-                        <TouchableOpacity
-                          key={year}
-                          style={[
-                            styles.dropdownItem,
-                            selectedYear === year && styles.dropdownItemSelected
-                          ]}
-                          onPress={() => {
-                            setSelectedYear(year);
-                            setShowYearDropdown(false);
-                          }}
-                        >
-                          <Text style={[
-                            styles.dropdownItemText,
-                            selectedYear === year && styles.dropdownItemTextSelected
-                          ]}>
-                            {year}
-                          </Text>
-                          {selectedYear === year && (
-                            <Text style={styles.dropdownItemCheck}>✓</Text>
-                          )}
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  </View>
+                  <Text style={styles.yearDropdownText}>{selectedYear}</Text>
+                  <Text style={styles.yearDropdownArrow}>▼</Text>
                 </TouchableOpacity>
-              </Modal>
-            </View>
-            
-            {/* Filtered Months Grid */}
-            {filteredMonths.length > 0 ? (
-              <View style={styles.monthsGrid}>
-                {filteredMonths.map((m) => (
-                  <TouchableOpacity key={`${m.year}-${m.month}`} style={styles.monthPill} onPress={() => loadSpecificMonth(m.year, m.month)}>
-                    <Text style={styles.monthPillLabel}>{m.monthName}</Text>
-                    <Text style={styles.monthPillSub}>Rs {m.totalAmount.toFixed(0)} • {m.totalMeals} meals</Text>
+
+                {/* Year Dropdown Modal */}
+                <Modal
+                  visible={showYearDropdown}
+                  transparent={true}
+                  animationType="fade"
+                  onRequestClose={() => setShowYearDropdown(false)}
+                >
+                  <TouchableOpacity
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={() => setShowYearDropdown(false)}
+                  >
+                    <View style={styles.dropdownContainer} onStartShouldSetResponder={() => true}>
+                      <View style={styles.dropdownHeader}>
+                        <Text style={styles.dropdownTitle}>Select Year</Text>
+                        <TouchableOpacity onPress={() => setShowYearDropdown(false)}>
+                          <Text style={styles.dropdownClose}>✕</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <ScrollView style={styles.dropdownScroll}>
+                        {uniqueYears.map((year) => (
+                          <TouchableOpacity
+                            key={year}
+                            style={[
+                              styles.dropdownItem,
+                              selectedYear === year && styles.dropdownItemSelected
+                            ]}
+                            onPress={() => {
+                              setSelectedYear(year);
+                              setShowYearDropdown(false);
+                            }}
+                          >
+                            <Text style={[
+                              styles.dropdownItemText,
+                              selectedYear === year && styles.dropdownItemTextSelected
+                            ]}>
+                              {year}
+                            </Text>
+                            {selectedYear === year && (
+                              <Text style={styles.dropdownItemCheck}>✓</Text>
+                            )}
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
                   </TouchableOpacity>
-                ))}
+                </Modal>
               </View>
-            ) : (
-              <View style={styles.noMonthsContainer}>
-                <Text style={styles.noMonthsText}>No months found for {selectedYear}</Text>
-              </View>
-            )}
-          </View>
-        );
-      })()}
 
-      {/* Selected Month Summary */}
-      {monthlySummary && (
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryHeader}>
-            <Text style={styles.summaryTitle}>📅 {monthlySummary.monthName} {monthlySummary.year}</Text>
-          </View>
-          <View style={styles.summaryStats}>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{monthlySummary.totalMeals}</Text>
-              <Text style={styles.statLabel}>Total Meals</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{formatPrice(monthlySummary.totalAmount)}</Text>
-              <Text style={styles.statLabel}>Total Spent</Text>
-            </View>
-          </View>
-        </View>
-      )}
-
-      {/* Analytics */}
-      {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#20B2AA" />
-          <Text style={styles.loadingText}>Loading analytics...</Text>
-        </View>
-      ) : analytics ? (
-        <View style={styles.analyticsCard}>
-          <Text style={styles.analyticsTitle}>📊 Detailed Analytics</Text>
-          
-          {/* Monthly Summary */}
-          <View style={styles.monthlySummarySection}>
-            <Text style={styles.sectionTitle}>📅 Period Summary</Text>
-            <View style={styles.summaryGrid}>
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryValue}>{formatNumber(monthlySummary?.totalMeals ?? 0)}</Text>
-                <Text style={styles.summaryLabel}>Total Meals</Text>
-              </View>
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryValue}>{formatPrice(monthlySummary?.totalAmount || 0)}</Text>
-                <Text style={styles.summaryLabel}>Total Spent</Text>
-              </View>
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryValue}>{formatNumber(analytics.activeDays)}</Text>
-                <Text style={styles.summaryLabel}>Active Days</Text>
-              </View>
-            </View>
-          </View>
-          
-          {/* Meal Type Breakdown */}
-          <View style={styles.breakdownContainer}>
-            <Text style={styles.breakdownTitle}>🍽️ Meal Breakdown</Text>
-            {Object.entries(analytics.mealBreakdown).map(([mealType, data]) => {
-              const mealEmoji = mealTypes.find(m => m.value === mealType)?.emoji || '🍽️';
-              const denominator = monthlySummary?.totalMeals ?? 0;
-              const percentage = denominator > 0 ? Math.round((data.count / denominator) * 100) : 0;
-              
-              return (
-                <View key={mealType} style={styles.breakdownItem}>
-                  <View style={styles.breakdownHeader}>
-                    <Text style={styles.breakdownEmoji}>{mealEmoji}</Text>
-                    <Text style={styles.breakdownMealType}>{mealType}</Text>
-                    <Text style={styles.breakdownPercentage}>{percentage}%</Text>
-                  </View>
-                  <View style={styles.breakdownStats}>
-                    <Text style={styles.breakdownCount}>{formatNumber(data.count)} meals</Text>
-                    <Text style={styles.breakdownTotal}>{formatPrice(data.total)}</Text>
-                  </View>
-                  <View style={styles.breakdownBar}>
-                    <View 
-                      style={[
-                        styles.breakdownBarFill, 
-                        { width: `${percentage}%`, backgroundColor: getMealTypeColor(mealType) }
-                      ]} 
-                    />
-                  </View>
+              {/* Filtered Months Grid */}
+              {filteredMonths.length > 0 ? (
+                <View style={styles.monthsGrid}>
+                  {filteredMonths.map((m) => (
+                    <TouchableOpacity key={`${m.year}-${m.month}`} style={styles.monthPill} onPress={() => loadSpecificMonth(m.year, m.month)}>
+                      <Text style={styles.monthPillLabel}>{m.monthName}</Text>
+                      <Text style={styles.monthPillSub}>Rs {m.totalAmount.toFixed(0)} • {m.totalMeals} meals</Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
-              );
-            })}
-          </View>
+              ) : (
+                <View style={styles.noMonthsContainer}>
+                  <Text style={styles.noMonthsText}>No months found for {selectedYear}</Text>
+                </View>
+              )}
+            </View>
+          );
+        })()}
 
-          {/* Daily Averages */}
-          <View style={styles.averagesContainer}>
-            <Text style={styles.averagesTitle}>📈 Daily Averages</Text>
-            <View style={styles.averagesGrid}>
-              <View style={styles.averageItem}>
-                <Text style={styles.averageValue}>{analytics.avgMealsPerDay}</Text>
-                <Text style={styles.averageLabel}>Meals/Day</Text>
+        {/* Selected Month Summary */}
+        {monthlySummary && (
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryHeader}>
+              <Text style={styles.summaryTitle}>📅 {monthlySummary.monthName} {monthlySummary.year}</Text>
+            </View>
+            <View style={styles.summaryStats}>
+              <View style={styles.statItem}>
+                <Text style={styles.statNumber}>{monthlySummary.totalMeals}</Text>
+                <Text style={styles.statLabel}>Total Meals</Text>
               </View>
-              <View style={styles.averageItem}>
-                <Text style={styles.averageValue}>Rs {analytics.avgSpentPerDay.toFixed(2)}</Text>
-                <Text style={styles.averageLabel}>Spent/Day</Text>
-              </View>
-              <View style={styles.averageItem}>
-                <Text style={styles.averageValue}>{analytics.activeDays}</Text>
-                <Text style={styles.averageLabel}>Active Days</Text>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={styles.statNumber}>{formatPrice(monthlySummary.totalAmount)}</Text>
+                <Text style={styles.statLabel}>Total Spent</Text>
               </View>
             </View>
           </View>
-        </View>
-      ) : (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyEmoji}>📊</Text>
-          <Text style={styles.emptyText}>No analytics data available</Text>
-          <Text style={styles.emptySubtext}>Select a date range to view analytics</Text>
-        </View>
-      )}
-    </ScrollView>
+        )}
+
+        {/* Analytics */}
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#20B2AA" />
+            <Text style={styles.loadingText}>Loading analytics...</Text>
+          </View>
+        ) : analytics ? (
+          <View style={styles.analyticsCard}>
+            <Text style={styles.analyticsTitle}>📊 Detailed Analytics</Text>
+
+            {/* Monthly Summary */}
+            <View style={styles.monthlySummarySection}>
+              <Text style={styles.sectionTitle}>📅 Period Summary</Text>
+              <View style={styles.summaryGrid}>
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryValue}>{formatNumber(monthlySummary?.totalMeals ?? 0)}</Text>
+                  <Text style={styles.summaryLabel}>Total Meals</Text>
+                </View>
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryValue}>{formatPrice(monthlySummary?.totalAmount || 0)}</Text>
+                  <Text style={styles.summaryLabel}>Total Spent</Text>
+                </View>
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryValue}>{formatNumber(analytics.activeDays)}</Text>
+                  <Text style={styles.summaryLabel}>Active Days</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Meal Type Breakdown */}
+            <View style={styles.breakdownContainer}>
+              <Text style={styles.breakdownTitle}>🍽️ Meal Breakdown</Text>
+              {Object.entries(analytics.mealBreakdown).map(([mealType, data]) => {
+                const mealEmoji = mealTypes.find(m => m.value === mealType)?.emoji || '🍽️';
+                const denominator = monthlySummary?.totalMeals ?? 0;
+                const percentage = denominator > 0 ? Math.round((data.count / denominator) * 100) : 0;
+
+                return (
+                  <View key={mealType} style={styles.breakdownItem}>
+                    <View style={styles.breakdownHeader}>
+                      <Text style={styles.breakdownEmoji}>{mealEmoji}</Text>
+                      <Text style={styles.breakdownMealType}>{mealType}</Text>
+                      <Text style={styles.breakdownPercentage}>{percentage}%</Text>
+                    </View>
+                    <View style={styles.breakdownStats}>
+                      <Text style={styles.breakdownCount}>{formatNumber(data.count)} meals</Text>
+                      <Text style={styles.breakdownTotal}>{formatPrice(data.total)}</Text>
+                    </View>
+                    <View style={styles.breakdownBar}>
+                      <View
+                        style={[
+                          styles.breakdownBarFill,
+                          { width: `${percentage}%`, backgroundColor: getMealTypeColor(mealType) }
+                        ]}
+                      />
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+
+            {/* Daily Averages */}
+            <View style={styles.averagesContainer}>
+              <Text style={styles.averagesTitle}>📈 Daily Averages</Text>
+              <View style={styles.averagesGrid}>
+                <View style={styles.averageItem}>
+                  <Text style={styles.averageValue}>{analytics.avgMealsPerDay}</Text>
+                  <Text style={styles.averageLabel}>Meals/Day</Text>
+                </View>
+                <View style={styles.averageItem}>
+                  <Text style={styles.averageValue}>Rs {analytics.avgSpentPerDay.toFixed(2)}</Text>
+                  <Text style={styles.averageLabel}>Spent/Day</Text>
+                </View>
+                <View style={styles.averageItem}>
+                  <Text style={styles.averageValue}>{analytics.activeDays}</Text>
+                  <Text style={styles.averageLabel}>Active Days</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyEmoji}>📊</Text>
+            <Text style={styles.emptyText}>No analytics data available</Text>
+            <Text style={styles.emptySubtext}>Select a date range to view analytics</Text>
+          </View>
+        )}
+      </ScrollView>
+      <BottomNav />
+    </View>
   );
 }
 

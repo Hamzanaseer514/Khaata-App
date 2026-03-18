@@ -1,5 +1,4 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { showError } from '@/utils/toast';
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -12,8 +11,16 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Animated,
+  StatusBar,
+  Keyboard
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import config from '../config/config';
+import BottomNav from '@/components/BottomNav';
+import { useTheme } from '@/contexts/DarkModeContext';
+import { Colors } from '@/constants/theme';
 
 interface Contact {
   _id: string;
@@ -22,26 +29,50 @@ interface Contact {
   email?: string;
   phone: string;
   balance: number;
+  profilePicture?: string | null;
   createdAt: string;
+  updatedAt: string;
+  lastTransactionDate?: string;
 }
 
 export default function ContactsListScreen() {
   const { token } = useAuth();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const { isDarkMode } = useTheme(); // Use isDarkMode from useTheme
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showEdit, setShowEdit] = useState(false);
-  const [editContactId, setEditContactId] = useState<string | null>(null);
-  const [editName, setEditName] = useState('');
-  const placeholderColor = isDark ? '#6b7280' : '#9ca3af';
-  const [editEmail, setEditEmail] = useState('');
-  const [editPhone, setEditPhone] = useState('');
+  const placeholderColor = isDarkMode ? '#6b7280' : '#9ca3af';
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<'all' | 'give' | 'get'>('all');
+  const [showFilters, setShowFilters] = useState(false);
+  const filterAnim = React.useRef(new Animated.Value(0)).current;
+
+  const formatLastEntry = (contact: Contact) => {
+    const dateString = contact.lastTransactionDate || contact.updatedAt || contact.createdAt;
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffTime = Math.abs(now.getTime() - date.getTime());
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 0) return 'Today';
+      if (diffDays === 1) return 'Yesterday';
+      if (diffDays < 7) return `${diffDays} days ago`;
+      if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+      
+      return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch (e) {
+      return 'Recently';
+    }
+  };
+
+  const themeColors = isDarkMode ? Colors.dark : Colors.light;
+  const accentColor = isDarkMode ? '#22d3ee' : '#0a7ea4';
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const slideAnim = React.useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
     fetchContacts();
@@ -51,6 +82,19 @@ export default function ContactsListScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchContacts(true);
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          tension: 20,
+          friction: 7,
+          useNativeDriver: true,
+        }),
+      ]).start();
     }, [])
   );
 
@@ -108,34 +152,8 @@ export default function ContactsListScreen() {
   };
 
   const openEdit = (c: Contact) => {
-    setEditContactId(c._id || c.id || '');
-    setEditName(c.name);
-    setEditEmail(c.email || '');
-    setEditPhone(c.phone);
-    setShowEdit(true);
-  };
-
-  const submitEdit = async () => {
-    if (!editContactId) return;
-    setSubmitting(true);
-    try {
-      const res = await fetch(`${config.BASE_URL}/contacts/${editContactId}`, {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: editName, email: editEmail, phone: editPhone })
-      });
-      const data = await res.json();
-      if (!data.success) {
-        showError(data.message || 'Failed to update contact');
-      } else {
-        setShowEdit(false);
-        fetchContacts(true);
-      }
-    } catch (e) {
-      showError('Failed to update contact');
-    } finally {
-      setSubmitting(false);
-    }
+    const id = c._id || c.id || '';
+    router.push(`/contacts/add?contactId=${id}&editMode=true`);
   };
 
   const confirmDelete = async () => {
@@ -160,19 +178,28 @@ export default function ContactsListScreen() {
     }
   };
 
-  // Search functionality
+  // Search and Filter functionality
   useEffect(() => {
-    if (searchQuery.trim() === '') {
-      setFilteredContacts(contacts);
-    } else {
-      const filtered = contacts.filter(contact =>
+    let filtered = contacts;
+
+    // Apply Filter Chips
+    if (activeFilter === 'give') {
+      filtered = filtered.filter(c => c.balance < 0);
+    } else if (activeFilter === 'get') {
+      filtered = filtered.filter(c => c.balance > 0);
+    }
+
+    // Apply Search Query
+    if (searchQuery.trim() !== '') {
+      filtered = filtered.filter(contact =>
         contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         contact.phone.includes(searchQuery) ||
         (contact.email && contact.email.toLowerCase().includes(searchQuery.toLowerCase()))
       );
-      setFilteredContacts(filtered);
     }
-  }, [searchQuery, contacts]);
+
+    setFilteredContacts(filtered);
+  }, [searchQuery, contacts, activeFilter]);
 
   const handleSearchChange = (text: string) => {
     setSearchQuery(text);
@@ -182,103 +209,304 @@ export default function ContactsListScreen() {
     setSearchQuery('');
   };
 
+  const toggleFilters = () => {
+    const toValue = showFilters ? 0 : 1;
+    setShowFilters(!showFilters);
+    Animated.spring(filterAnim, {
+      toValue,
+      tension: 50,
+      friction: 8,
+      useNativeDriver: false, // Height/Opacity combo
+    }).start();
+  };
+
   const renderContact = ({ item }: { item: Contact }) => (
-    <View style={styles.contactCard}>
-      <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }} onPress={() => handleContactPress(item)}>
-      <View style={styles.contactAvatar}>
-          <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
-      </View>
-      <View style={styles.contactInfo}>
-        <Text style={styles.contactName}>{item.name}</Text>
-        <Text style={styles.contactPhone}>{item.phone}</Text>
-          {item.email && (<Text style={styles.contactEmail}>{item.email}</Text>)}
-      </View>
-      <View style={styles.contactBalance}>
-          <Text style={[styles.balanceAmount, { color: item.balance > 0 ? '#27ae60' : item.balance < 0 ? '#e74c3c' : '#7f8c8d' }]}>
-          Rs {Math.abs(item.balance).toFixed(2)}
-        </Text>
-        <Text style={styles.balanceLabel}>
-          {item.balance > 0 ? 'Friend owes' : item.balance < 0 ? 'You owe' : 'Settled'}
-        </Text>
-      </View>
-    </TouchableOpacity>
-      <View style={styles.rowActions}>
-        <TouchableOpacity style={[styles.iconBtn, styles.iconEdit]} onPress={() => openEdit(item)}>
-          <Text style={[styles.iconText, styles.iconEditText]}>✎</Text>
+    <Animated.View style={[
+      styles.contactCard,
+      dynamicStyles.contactCard,
+      { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+    ]}>
+      <TouchableOpacity 
+        style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }} 
+        onPress={() => handleContactPress(item)}
+        activeOpacity={0.7}
+      >
+        <View style={[styles.contactAvatar, dynamicStyles.avatarCircle, { backgroundColor: isDarkMode ? 'rgba(34, 211, 238, 0.1)' : 'rgba(10, 126, 164, 0.05)' }]}>
+            {item.profilePicture ? (
+              <Image 
+                source={{ uri: item.profilePicture }} 
+                style={styles.avatarImage} 
+                contentFit="cover"
+              />
+            ) : (
+              <Text style={[styles.avatarText, { color: isDarkMode ? '#22d3ee' : '#0a7ea4' }]}>
+                {item.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+              </Text>
+            )}
+        </View>
+        <View style={styles.contactInfo}>
+          <Text 
+            style={[styles.contactName, { color: themeColors.text }]} 
+            numberOfLines={1} 
+            ellipsizeMode="tail"
+          >
+            {item.name}
+          </Text>
+          <Text style={[styles.contactSubtext, { color: isDarkMode ? '#94a3b8' : '#64748b' }]}>
+            Last entry: {formatLastEntry(item)}
+          </Text>
+        </View>
+        <View style={styles.contactBalance}>
+            <Text style={[styles.balanceAmount, { color: item.balance > 0 ? '#22c55e' : item.balance < 0 ? '#ef4444' : (isDarkMode ? '#64748b' : '#94a3b8') }]}>
+            Rs {Math.round(Math.abs(item.balance)).toLocaleString()}
+          </Text>
+          <Text style={[styles.balanceLabel, { color: item.balance > 0 ? '#22c55e' : item.balance < 0 ? '#ef4444' : (isDarkMode ? '#475569' : '#94a3b8') }]}>
+            {item.balance > 0 ? "YOU'LL GET" : item.balance < 0 ? "YOU'LL GIVE" : 'SETTLED'}
+          </Text>
+        </View>
+      </TouchableOpacity>
+      
+      <View style={styles.compactActions}>
+        <TouchableOpacity 
+          style={styles.smallIconBtn} 
+          onPress={() => openEdit(item)}
+          activeOpacity={0.6}
+        >
+          <Ionicons name="pencil" size={14} color={isDarkMode ? '#64748b' : '#94a3b8'} />
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.iconBtn, styles.iconDelete]} onPress={() => setConfirmDeleteId(item._id || item.id || '')}>
-          <Text style={[styles.iconText, styles.iconDeleteText]}>🗑️</Text>
+        <TouchableOpacity 
+          style={styles.smallIconBtn} 
+          onPress={() => setConfirmDeleteId(item._id || item.id || '')}
+          activeOpacity={0.6}
+        >
+          <Ionicons name="trash-outline" size={14} color="#ef4444" opacity={0.6} />
         </TouchableOpacity>
       </View>
-    </View>
+    </Animated.View>
+  );
+
+  const renderFilterChips = () => (
+    <Animated.View style={[
+      styles.filterContainer,
+      {
+        opacity: filterAnim,
+        maxHeight: filterAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, 60],
+        }),
+        marginBottom: filterAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, 16],
+        }),
+        transform: [{
+          translateY: filterAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [-10, 0],
+          })
+        }]
+      }
+    ]}>
+      <TouchableOpacity 
+        style={[
+          styles.filterChip, 
+          activeFilter === 'all' && { backgroundColor: accentColor },
+          { borderColor: activeFilter === 'all' ? accentColor : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'), borderWidth: 1 }
+        ]}
+        onPress={() => setActiveFilter('all')}
+      >
+        <Text style={[
+          styles.filterText, 
+          { color: activeFilter === 'all' ? '#fff' : (isDarkMode ? '#94a3b8' : '#475569') }
+        ]}>
+          All Contacts
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity 
+        style={[
+          styles.filterChip, 
+          activeFilter === 'give' && { backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.1)' },
+          { borderColor: activeFilter === 'give' ? '#ef4444' : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'), borderWidth: 1 }
+        ]}
+        onPress={() => setActiveFilter('give')}
+      >
+        <Text style={[
+          styles.filterText, 
+          { color: activeFilter === 'give' ? '#ef4444' : (isDarkMode ? '#94a3b8' : '#475569') }
+        ]}>
+          You'll Give
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity 
+        style={[
+          styles.filterChip, 
+          activeFilter === 'get' && { backgroundColor: isDarkMode ? 'rgba(34, 197, 94, 0.2)' : 'rgba(34, 197, 94, 0.1)' },
+          { borderColor: activeFilter === 'get' ? '#22c55e' : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'), borderWidth: 1 }
+        ]}
+        onPress={() => setActiveFilter('get')}
+      >
+        <Text style={[
+          styles.filterText, 
+          { color: activeFilter === 'get' ? '#22c55e' : (isDarkMode ? '#94a3b8' : '#475569') }
+        ]}>
+          You'll Get
+        </Text>
+      </TouchableOpacity>
+    </Animated.View>
   );
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Text style={styles.emptyIcon}>
-        {searchQuery.trim() ? '🔍' : '👥'}
-      </Text>
-      <Text style={styles.emptyTitle}>
+      <View style={[styles.emptyIconContainer, { backgroundColor: isDarkMode ? 'rgba(34, 211, 238, 0.05)' : 'rgba(10, 126, 164, 0.05)' }]}>
+        <Ionicons 
+          name={searchQuery.trim() ? "search-outline" : "people-outline"} 
+          size={80} 
+          color={isDarkMode ? 'rgba(34, 211, 238, 0.2)' : 'rgba(10, 126, 164, 0.2)'} 
+        />
+      </View>
+      <Text style={[styles.emptyTitle, { color: themeColors.text }]}>
         {searchQuery.trim() ? 'No Results Found' : 'No Contacts Yet'}
       </Text>
-      <Text style={styles.emptyDescription}>
+      <Text style={[styles.emptyDescription, { color: isDarkMode ? '#64748b' : '#94a3b8' }]}>
         {searchQuery.trim() 
-          ? `No contacts found for "${searchQuery}"`
-          : 'Start by adding your first contact to manage your Khaata'
+          ? `We couldn't find any contacts matching "${searchQuery}"`
+          : 'Start by adding your first contact to manage your shared balances beautifully.'
         }
       </Text>
       {!searchQuery.trim() && (
-        <TouchableOpacity style={styles.addFirstButton} onPress={handleAddContact}>
+        <TouchableOpacity 
+          style={[styles.addFirstButton, { backgroundColor: accentColor }]} 
+          onPress={handleAddContact}
+          activeOpacity={0.8}
+        >
           <Text style={styles.addFirstButtonText}>Add First Contact</Text>
         </TouchableOpacity>
       )}
     </View>
   );
 
+  const dynamicStyles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: themeColors.background,
+    },
+    headerBackground: {
+      backgroundColor: isDarkMode ? '#1c1e1f' : accentColor,
+      paddingTop: 60,
+      paddingBottom: 20,
+      paddingHorizontal: 20,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderBottomWidth: isDarkMode ? 1 : 0,
+      borderColor: 'rgba(34, 211, 238, 0.2)',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 5,
+    },
+    headerTitle: {
+      color: '#ffffff',
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    searchBar: {
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : '#f1f5f9', // Updated to match reference light blue-grey
+      borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+      borderWidth: 1,
+    },
+    searchInput: {
+      color: themeColors.text,
+      backgroundColor: 'transparent', // Ensure no internal background
+    },
+    contactCard: {
+      backgroundColor: isDarkMode ? 'rgba(30, 41, 59, 0.5)' : '#ffffff',
+      borderColor: isDarkMode ? 'rgba(255,255,255,0.05)' : '#f1f5f9',
+      borderWidth: 1,
+    },
+    avatarCircle: {
+      backgroundColor: isDarkMode ? 'rgba(34, 211, 238, 0.1)' : accentColor,
+    }
+  });
+
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#20B2AA" />
-        <Text style={styles.loadingText}>Loading contacts...</Text>
+      <View style={[styles.loadingContainer, dynamicStyles.container]}>
+        <ActivityIndicator size="large" color={accentColor} />
+        <Text style={[styles.loadingText, { color: isDarkMode ? '#94a3b8' : '#7f8c8d' }]}>Loading contacts...</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
+    <View style={dynamicStyles.container}>
+      <StatusBar barStyle="light-content" />
+      
+      {/* Premium Header */}
+      <View style={dynamicStyles.headerBackground}>
+        <TouchableOpacity 
           onPress={() => router.back()}
+          hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
         >
-          <Text style={styles.backButtonText}>‹ Back</Text>
+          <Ionicons name="chevron-back" size={28} color="#ffffff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Contacts</Text>
-        <TouchableOpacity style={styles.addButton} onPress={handleAddContact}>
-          <Text style={styles.addButtonText}>+ Add</Text>
+        
+        <Text style={dynamicStyles.headerTitle}>My Contacts</Text>
+        
+        <TouchableOpacity 
+          style={styles.addButton} 
+          onPress={handleAddContact}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="add" size={24} color="#ffffff" />
         </TouchableOpacity>
       </View>
 
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Text style={styles.searchIcon}>🔍</Text>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search contacts..."
-            placeholderTextColor={placeholderColor}
-            value={searchQuery}
-            onChangeText={handleSearchChange}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
-              <Text style={styles.clearIcon}>✕</Text>
-            </TouchableOpacity>
-          )}
+      {/* Search Bar Refined */}
+      <View style={[styles.searchContainer, { backgroundColor: 'transparent' }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View style={[styles.searchBar, dynamicStyles.searchBar, { flex: 1, paddingVertical: 8 }]}>
+            <Ionicons name="search-outline" size={18} color={placeholderColor} style={{ marginRight: 10 }} />
+            <TextInput
+              style={[styles.searchInput, dynamicStyles.searchInput, { fontSize: 15 }]}
+              placeholder="Search by name or number..."
+              placeholderTextColor={placeholderColor}
+              value={searchQuery}
+              onChangeText={handleSearchChange}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {searchQuery.length > 0 ? (
+              <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
+                <Ionicons name="close-circle" size={20} color={placeholderColor} />
+              </TouchableOpacity>
+            ) : (
+              <Ionicons name="mic-outline" size={20} color={placeholderColor} />
+            )}
+          </View>
+          
+          <TouchableOpacity 
+            style={[
+              styles.filterToggleBtn, 
+              { 
+                backgroundColor: showFilters ? accentColor : (isDarkMode ? 'rgba(255,255,255,0.05)' : '#f1f5f9'),
+                borderColor: showFilters ? accentColor : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)')
+              }
+            ]} 
+            onPress={toggleFilters}
+            activeOpacity={0.7}
+          >
+            <Ionicons 
+              name={showFilters ? "options" : "options-outline"} 
+              size={20} 
+              color={showFilters ? "#ffffff" : placeholderColor} 
+            />
+          </TouchableOpacity>
         </View>
       </View>
+
+      {/* Filter Chips */}
+      {renderFilterChips()}
 
       {filteredContacts.length === 0 ? (
         renderEmptyState()
@@ -289,45 +517,35 @@ export default function ContactsListScreen() {
           keyExtractor={(item) => item._id || item.id || 'unknown'}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={['#20B2AA']}
-            />
-          }
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={accentColor}
+                colors={[accentColor]}
+              />
+            }
         />
-      )}
-
-      {/* Edit Modal */}
-      {showEdit && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.editModal}>
-            <Text style={styles.modalTitle}>Edit Contact</Text>
-            <View style={styles.inputContainer}><Text style={styles.label}>Name</Text><TextInput style={styles.input} value={editName} onChangeText={setEditName} /></View>
-            <View style={styles.inputContainer}><Text style={styles.label}>Email</Text><TextInput style={styles.input} value={editEmail} onChangeText={setEditEmail} autoCapitalize="none" keyboardType="email-address" /></View>
-            <View style={styles.inputContainer}><Text style={styles.label}>Phone</Text><TextInput style={styles.input} value={editPhone} onChangeText={setEditPhone} keyboardType="phone-pad" /></View>
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowEdit(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
-              <TouchableOpacity style={[styles.saveBtn, submitting && { opacity: 0.6 }]} onPress={submitEdit} disabled={submitting}><Text style={styles.saveText}>{submitting ? 'Saving…' : 'Save'}</Text></TouchableOpacity>
-            </View>
-          </View>
-        </View>
       )}
 
       {/* Delete Confirm */}
       {confirmDeleteId && (
         <View style={styles.modalOverlay}>
-          <View style={styles.confirmModal}>
-            <Text style={styles.modalTitle}>Delete contact?</Text>
-            <Text style={styles.confirmText}>This will also delete related records.</Text>
+          <View style={[styles.confirmModal, { backgroundColor: isDarkMode ? '#1e293b' : '#ffffff' }]}>
+            <Text style={[styles.modalTitle, { color: themeColors.text }]}>Delete contact?</Text>
+            <Text style={[styles.confirmText, { color: isDarkMode ? '#94a3b8' : '#7f8c8d' }]}>This will also delete all related transaction records. This action cannot be undone.</Text>
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setConfirmDeleteId(null)}><Text style={styles.cancelText}>No</Text></TouchableOpacity>
-              <TouchableOpacity style={[styles.deleteBtn, submitting && { opacity: 0.6 }]} onPress={confirmDelete} disabled={submitting}><Text style={styles.deleteText}>{submitting ? 'Deleting…' : 'Yes, delete'}</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.cancelBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : '#f3f4f6' }]} onPress={() => setConfirmDeleteId(null)}>
+                <Text style={[styles.cancelText, { color: themeColors.text }]}>No, Keep it</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.deleteBtn, submitting && { opacity: 0.6 }]} onPress={confirmDelete} disabled={submitting}>
+                <Text style={styles.deleteText}>{submitting ? 'Deleting…' : 'Yes, Delete'}</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
       )}
+      <BottomNav />
     </View>
   );
 }
@@ -335,208 +553,253 @@ export default function ContactsListScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#7f8c8d',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-    backgroundColor: '#20B2AA',
-  },
-  backButton: {
-    paddingVertical: 8,
-  },
-  backButtonText: {
-    fontSize: 18,
-    color: 'white',
-    fontWeight: '600',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: 'white',
+    fontWeight: '500',
   },
   addButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
+    width: 40,
+    height: 40,
     borderRadius: 20,
-  },
-  addButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   listContainer: {
     padding: 20,
+    paddingBottom: 100,
   },
   contactCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 12,
+    borderRadius: 16,
+    height: 80, // Same uniform height for all cards
+    paddingHorizontal: 14,
+    marginBottom: 8,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 1,
   },
-  rowActions: { flexDirection: 'column', gap: 6, marginLeft: 8, alignItems: 'center', justifyContent: 'center' },
-  iconBtn: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  iconEdit: { backgroundColor: '#e0f2fe' },
-  iconEditText: { color: '#0369a1' },
-  iconDelete: { backgroundColor: '#fee2e2' },
-  iconDeleteText: { color: '#b91c1c' },
-  iconText: { fontSize: 14 },
   contactAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#20B2AA',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 15,
+    marginRight: 14,
+    overflow: 'hidden',
+    borderColor: 'rgba(0,0,0,0.05)',
+    borderWidth: 1,
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   avatarText: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: 'white',
+    fontWeight: '800',
   },
   contactInfo: {
     flex: 1,
+    paddingLeft: 2,
   },
   contactName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#2c3e50',
-    marginBottom: 4,
+    fontWeight: '700',
+    marginBottom: 1,
   },
-  contactPhone: {
-    fontSize: 14,
-    color: '#7f8c8d',
-    marginBottom: 2,
-  },
-  contactEmail: {
-    fontSize: 12,
-    color: '#95a5a6',
+  contactSubtext: {
+    fontSize: 13,
+    fontWeight: '400',
   },
   contactBalance: {
-    alignItems: 'center',
+    alignItems: 'flex-end',
+    minWidth: 90,
   },
   balanceAmount: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '800',
   },
   balanceLabel: {
-    fontSize: 10,
-    color: '#7f8c8d',
+    fontSize: 9,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    marginTop: 2,
+    letterSpacing: 0.5,
+  },
+  compactActions: {
+    flexDirection: 'column',
+    justifyContent: 'center',
+    gap: 8,
+    marginLeft: 6,
+    width: 24,
+    alignItems: 'center',
+  },
+  smallIconBtn: {
+    padding: 2,
   },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 40,
+    paddingTop: 40,
   },
-  emptyIcon: {
-    fontSize: 80,
-    marginBottom: 20,
+  emptyIconContainer: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
   },
   emptyTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    marginBottom: 10,
+    fontSize: 22,
+    fontWeight: '800',
+    marginBottom: 8,
   },
   emptyDescription: {
-    fontSize: 16,
-    color: '#7f8c8d',
+    fontSize: 15,
     textAlign: 'center',
-    marginBottom: 30,
-    lineHeight: 24,
+    marginBottom: 32,
+    lineHeight: 22,
+    paddingHorizontal: 20,
   },
   addFirstButton: {
-    backgroundColor: '#20B2AA',
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 25,
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   addFirstButtonText: {
     color: 'white',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
-  // Search Bar Styles
   searchContainer: {
     paddingHorizontal: 20,
     paddingVertical: 10,
-    backgroundColor: '#f8f9fa',
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 12,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 0, // Remove elevation to avoid "double bg" look
   },
-  searchIcon: {
-    fontSize: 16,
-    marginRight: 10,
-    color: '#7f8c8d',
+  filterContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    marginBottom: 16,
+    gap: 10,
+  },
+  filterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: 'transparent',
+    borderColor: 'rgba(0,0,0,0.05)',
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  filterText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  filterToggleBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 0,
   },
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#2c3e50',
+    fontWeight: '500',
   },
   clearButton: {
     padding: 5,
   },
-  clearIcon: {
-    fontSize: 16,
-    color: '#7f8c8d',
-    fontWeight: 'bold',
+  modalOverlay: { 
+    position: 'absolute', 
+    top: 0, 
+    left: 0, 
+    right: 0, 
+    bottom: 0, 
+    backgroundColor: 'rgba(0,0,0,0.5)', 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    zIndex: 1000,
   },
-  inputContainer: { marginBottom: 14 },
-  label: { fontSize: 13, color: '#374151', marginBottom: 6, fontWeight: '600' },
-  input: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, backgroundColor: '#fff', color: '#1f2937' },
-  modalOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  editModal: { width: '90%', backgroundColor: '#fff', borderRadius: 14, padding: 16 },
-  confirmModal: { width: '85%', backgroundColor: '#fff', borderRadius: 14, padding: 16 },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 8 },
-  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 8 },
-  cancelBtn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, backgroundColor: '#f3f4f6' },
-  cancelText: { color: '#374151', fontWeight: '700' },
-  saveBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, backgroundColor: '#20B2AA' },
-  saveText: { color: '#fff', fontWeight: '800' },
-  deleteBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, backgroundColor: '#ef4444' },
-  deleteText: { color: '#fff', fontWeight: '800' },
-  confirmText: { color: '#6b7280', marginTop: 4 },
+  confirmModal: { 
+    width: '85%', 
+    borderRadius: 24, 
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalTitle: { 
+    fontSize: 20, 
+    fontWeight: '800', 
+    marginBottom: 12,
+  },
+  confirmText: { 
+    fontSize: 15,
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  modalActions: { 
+    flexDirection: 'row', 
+    justifyContent: 'flex-end', 
+    gap: 12,
+  },
+  cancelBtn: { 
+    paddingHorizontal: 20, 
+    paddingVertical: 12, 
+    borderRadius: 12,
+  },
+  cancelText: { 
+    fontWeight: '700', 
+    fontSize: 15,
+  },
+  deleteBtn: { 
+    paddingHorizontal: 20, 
+    paddingVertical: 12, 
+    borderRadius: 12, 
+    backgroundColor: '#ef4444',
+  },
+  deleteText: { 
+    color: '#fff', 
+    fontWeight: '700',
+    fontSize: 15,
+  },
 });

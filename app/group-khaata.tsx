@@ -1,4 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
+import BottomNav from '@/components/BottomNav';
 import { showError } from '@/utils/toast';
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -182,6 +183,7 @@ export default function GroupKhaataScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+      <BottomNav />
     </View>
   );
 }
@@ -206,7 +208,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: 50,
     paddingBottom: 20,
     backgroundColor: '#9b59b6',
   },
@@ -237,6 +239,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: 20,
+    paddingBottom: 100, // Extra padding for BottomNav
   },
   transactionCard: {
     backgroundColor: 'white',

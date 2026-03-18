@@ -1,4 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
+import BottomNav from '@/components/BottomNav';
 import { showError, showSuccess } from '@/utils/toast';
 import * as FileSystem from 'expo-file-system/legacy';
 import { router } from 'expo-router';
@@ -327,6 +328,7 @@ export default function ReportsScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+      <BottomNav />
     </View>
   );
 }
@@ -422,7 +424,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 100, // Extra padding for BottomNav
   },
   contactCard: {
     backgroundColor: 'white',

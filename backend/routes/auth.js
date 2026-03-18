@@ -3,8 +3,111 @@ const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 const { authenticateToken, JWT_SECRET } = require('../middleware/auth');
+const { 
+  getForgotPasswordTemplate 
+} = require('../services/emailService');
 
 const router = express.Router();
+
+// In-memory OTP store for password recovery (email -> { code, expiresAt })
+const recoveryOtps = new Map();
+
+// POST /api/auth/forgot-password - Send OTP for password recovery
+router.post('/forgot-password', [
+  body('email').isEmail().normalizeEmail({ gmail_remove_dots: false }),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, message: 'Validation failed', errors: errors.array() });
+    }
+
+    const { email } = req.body;
+
+    // Check if user exists
+    const user = await User.findOne({ email });
+    if (!user) {
+      // For security, don't reveal that the user doesn't exist
+      // But for this app, we can be more helpful or follow the standard
+      return res.status(404).json({ success: false, message: 'User with this email not found' });
+    }
+
+    const code = generateOtp();
+    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+    recoveryOtps.set(email, { code, expiresAt });
+
+    // Send email
+    const nodemailer = require('nodemailer');
+    const transporter = nodemailer.createTransport({
+      host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+      port: process.env.EMAIL_PORT || 587,
+      secure: false,
+      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+    });
+
+    const emailContent = getForgotPasswordTemplate({ name: user.name, code });
+
+    await transporter.sendMail({
+      from: `Khaata <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: emailContent.subject,
+      html: emailContent.html,
+      text: emailContent.text,
+    });
+
+    return res.json({ success: true, message: 'Recovery code sent to email' });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// POST /api/auth/reset-password - Verify OTP and reset password
+router.post('/reset-password', [
+  body('email').isEmail().normalizeEmail({ gmail_remove_dots: false }),
+  body('otp').isLength({ min: 4, max: 6 }),
+  body('newPassword').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long'),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, message: 'Validation failed', errors: errors.array() });
+    }
+
+    const { email, otp, newPassword } = req.body;
+    const entry = recoveryOtps.get(email);
+
+    if (!entry) {
+      return res.status(400).json({ success: false, message: 'No recovery request pending for this email' });
+    }
+    if (Date.now() > entry.expiresAt) {
+      recoveryOtps.delete(email);
+      return res.status(400).json({ success: false, message: 'Recovery code expired' });
+    }
+    if (entry.code !== otp) {
+      return res.status(400).json({ success: false, message: 'Invalid recovery code' });
+    }
+
+    // Update user password
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    user.password = newPassword;
+    await user.save();
+    
+    // Clean up
+    recoveryOtps.delete(email);
+
+    return res.json({ success: true, message: 'Password reset successfully' });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+
 
 // Ensure we preserve admin role even if DB role is missing but email matches ADMIN_EMAIL
 const resolveRole = (email, role) => {

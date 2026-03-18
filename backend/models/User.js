@@ -27,6 +27,19 @@ const userSchema = new mongoose.Schema({
     enum: ['user', 'admin'],
     default: 'user'
   },
+  points: {
+    type: Number,
+    default: 0
+  },
+  level: {
+    type: String,
+    enum: ['Silver', 'Gold', 'Platinum'],
+    default: 'Silver'
+  },
+  dailyTransactionCount: {
+    count: { type: Number, default: 0 },
+    lastReset: { type: Date, default: Date.now }
+  },
   createdAt: {
     type: Date,
     default: Date.now

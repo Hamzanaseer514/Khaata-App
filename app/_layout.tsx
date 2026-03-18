@@ -6,18 +6,26 @@ import Toast from 'react-native-toast-message';
 
 import AuthWrapper from '@/components/AuthWrapper';
 import { AuthProvider } from '@/contexts/AuthContext';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { DarkModeProvider, useTheme } from '@/contexts/DarkModeContext';
 
 export const unstable_settings = {
   anchor: '(tabs)',
 };
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  return (
+    <DarkModeProvider>
+      <RootLayoutContent />
+    </DarkModeProvider>
+  );
+}
+
+function RootLayoutContent() {
+  const { isDarkMode } = useTheme();
 
   return (
     <AuthProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <ThemeProvider value={isDarkMode ? DarkTheme : DefaultTheme}>
         <AuthWrapper>
           <Stack>
             <Stack.Screen name="index" options={{ headerShown: false }} />
@@ -44,7 +52,7 @@ export default function RootLayout() {
             <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
           </Stack>
         </AuthWrapper>
-        <StatusBar style="auto" />
+        <StatusBar style={isDarkMode ? 'light' : 'dark'} />
         <Toast />
       </ThemeProvider>
     </AuthProvider>

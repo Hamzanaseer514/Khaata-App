@@ -5,15 +5,15 @@ import { router } from 'expo-router';
 import { Formik } from 'formik';
 import React, { useRef, useState } from 'react';
 import {
-    Animated,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Animated,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import * as Yup from 'yup';
 
@@ -58,14 +58,14 @@ export default function ChangePasswordScreen() {
     confirmNewPassword: string;
   }) => {
     setIsLoading(true);
-    
+
     try {
       const result = await changePassword(
         values.currentPassword,
         values.newPassword,
         values.confirmNewPassword
       );
-      
+
       if (result.success) {
         showSuccess(result.message || 'Password changed');
         router.back();
@@ -74,7 +74,7 @@ export default function ChangePasswordScreen() {
       }
     } catch (error) {
       console.error('Change password error:', error);
-      
+
       // Check if it's a network error
       if (error instanceof TypeError && error.message.includes('fetch')) {
         showError('Please check your internet connection and try again.', 'Network Error');
@@ -89,13 +89,13 @@ export default function ChangePasswordScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView style={styles.scrollView}>
         {/* Header */}
-        <Animated.View 
+        <Animated.View
           style={[
             styles.header,
             {
@@ -111,7 +111,7 @@ export default function ChangePasswordScreen() {
           <View style={styles.headerSpacer} />
         </Animated.View>
 
-        <Animated.View 
+        <Animated.View
           style={[
             styles.content,
             {
@@ -223,7 +223,7 @@ export default function ChangePasswordScreen() {
                   >
                     <Text style={styles.cancelButtonText}>Cancel</Text>
                   </TouchableOpacity>
-                  
+
                   <TouchableOpacity
                     style={[styles.changeButton, isLoading && styles.buttonDisabled]}
                     onPress={() => handleSubmit()}

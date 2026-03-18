@@ -1,20 +1,24 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useTheme } from '@/contexts/DarkModeContext';
+import { Colors } from '@/constants/theme';
 import { showError, showSuccess } from '@/utils/toast';
 import { router } from 'expo-router';
 import { Formik } from 'formik';
 import React, { useRef, useState } from 'react';
 import {
-    Animated,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Animated,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  StatusBar,
+  ScrollView,
+  Keyboard
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Yup from 'yup';
 
 const validationSchema = Yup.object().shape({
@@ -35,38 +39,62 @@ const validationSchema = Yup.object().shape({
 
 export default function RegisterScreen() {
   const { requestSignupOtp } = useAuth();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const { isDarkMode, toggleTheme } = useTheme();
   const [isLoading, setIsLoading] = useState(false);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+  const [contentHeight, setContentHeight] = useState(0);
+  const [containerHeight, setContainerHeight] = useState(0);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  const themeColors = isDarkMode ? Colors.dark : Colors.light;
+  const accentColor = isDarkMode ? '#22d3ee' : '#0a7ea4';
+  
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
-  const placeholderColor = isDark ? '#6b7280' : '#9ca3af';
+  const slideAnim = useRef(new Animated.Value(30)).current;
+  const logoScale = useRef(new Animated.Value(0.9)).current;
 
   React.useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 1000,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
         duration: 800,
         useNativeDriver: true,
       }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        tension: 20,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+      Animated.spring(logoScale, {
+        toValue: 1,
+        tension: 10,
+        friction: 5,
+        useNativeDriver: true,
+      }),
     ]).start();
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
   }, []);
 
   const handleRegister = async (values: { name: string; email: string; password: string; confirmPassword: string }) => {
     setIsLoading(true);
-    
+
     try {
       if (values.password !== values.confirmPassword) {
         showError('Passwords must match');
         return;
       }
       const result = await requestSignupOtp(values.name, values.email, values.password);
-      
+
       if (result.success) {
         showSuccess('OTP sent to your email');
         router.push({ pathname: '/verify-otp', params: { email: values.email } });
@@ -75,8 +103,6 @@ export default function RegisterScreen() {
       }
     } catch (error) {
       console.error('Register error:', error);
-      
-      // Check if it's a network error
       if (error instanceof TypeError && error.message.includes('fetch')) {
         showError('Please check your internet connection and try again.', 'Network Error');
       } else if (error instanceof Error) {
@@ -89,329 +115,447 @@ export default function RegisterScreen() {
     }
   };
 
+  const dynamicStyles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: themeColors.background,
+    },
+    headerBackground: {
+      backgroundColor: isDarkMode ? '#1c1e1f' : accentColor,
+      borderBottomLeftRadius: 40,
+      borderBottomRightRadius: 40,
+      paddingTop: 60,
+      paddingBottom: 40,
+      alignItems: 'center',
+      borderBottomWidth: isDarkMode ? 2 : 0,
+      borderLeftWidth: isDarkMode ? 0.5 : 0,
+      borderRightWidth: isDarkMode ? 0.5 : 0,
+      borderColor: isDarkMode ? accentColor : 'transparent',
+      shadowColor: accentColor,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: isDarkMode ? 0.6 : 0.3,
+      shadowRadius: isDarkMode ? 12 : 15,
+      elevation: 10,
+    },
+    logoCircle: {
+      backgroundColor: 'rgba(255,255,255,0.2)',
+      borderColor: 'rgba(255,255,255,0.3)',
+    },
+    brandText: {
+      color: 'rgba(255,255,255,0.8)',
+    },
+    welcomeText: {
+      color: '#ffffff',
+    },
+    accentLine: {
+      backgroundColor: '#ffffff',
+    },
+    input: {
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : '#f9fafb',
+      borderColor: isDarkMode ? '#334155' : '#e5e7eb',
+      color: themeColors.text,
+    },
+    inputLabel: {
+      color: isDarkMode ? '#94a3b8' : '#64748b',
+    },
+    registerButton: {
+      backgroundColor: accentColor,
+      shadowColor: accentColor,
+    }
+  });
+
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+    <View style={dynamicStyles.container}>
+      <StatusBar barStyle="light-content" />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-        <View style={styles.background}>
-          {/* Header Section with Blue Background */}
-          <View style={styles.headerSection}>
-            <Animated.View 
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={isKeyboardVisible || contentHeight > containerHeight}
+          bounces={false}
+          overScrollMode="never"
+          onContentSizeChange={(w, h) => setContentHeight(h)}
+          onLayout={(e) => setContainerHeight(e.nativeEvent.layout.height)}
+        >
+          <View style={styles.inner}>
+            {/* Header with Background */}
+            <View style={dynamicStyles.headerBackground}>
+              {/* Logo section */}
+              <Animated.View 
+                style={[
+                  styles.headerContainer, 
+                  { opacity: fadeAnim, transform: [{ scale: logoScale }] }
+                ]}
+              >
+                <View style={[styles.logoCircle, dynamicStyles.logoCircle]}>
+                  <View style={styles.logoIconBg}>
+                    <Text style={styles.logoEmoji}>🚀</Text>
+                  </View>
+                </View>
+                <Text style={[styles.brandText, dynamicStyles.brandText]}>K H A A T A</Text>
+              </Animated.View>
+
+              {/* Title section inside header */}
+              <Animated.View 
+                style={[
+                  styles.titleContainer, 
+                  { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+                ]}
+              >
+                <Text style={[styles.titleText, dynamicStyles.welcomeText]}>Create Account</Text>
+                <View style={[styles.accentLine, dynamicStyles.accentLine]} />
+              </Animated.View>
+            </View>
+
+            {/* Form Section */}
+            <Animated.View
               style={[
-                styles.headerContent,
-                {
-                  opacity: fadeAnim,
+                styles.formContainer,
+                { 
+                  opacity: fadeAnim, 
                   transform: [{ translateY: slideAnim }],
+                  marginTop: 30, // Space from header
+                  paddingHorizontal: 32,
                 }
               ]}
             >
-              <Text style={styles.welcomeTitle}>Create Account</Text>
-              <Text style={styles.welcomeSubtitle}>Join Khaata and start managing your finances</Text>
-              
-              {/* Illustration */}
-              <View style={styles.illustrationContainer}>
-                <Text style={styles.illustration}>🚀💰</Text>
-              </View>
-            </Animated.View>
-          </View>
+              <Formik
+                initialValues={{ name: '', email: '', password: '', confirmPassword: '' }}
+                validationSchema={validationSchema}
+                onSubmit={handleRegister}
+              >
+                {({ handleChange, handleBlur, handleSubmit, values, errors, touched }) => (
+                  <View style={styles.form}>
+                    {/* Name Field */}
+                    <View style={styles.inputWrapper}>
+                      <Text style={[styles.inputLabel, dynamicStyles.inputLabel]}>Full Name</Text>
+                      <TextInput
+                        style={[
+                          styles.input,
+                          dynamicStyles.input,
+                          focusedField === 'name' && { borderColor: accentColor },
+                          errors.name && touched.name && styles.inputError
+                        ]}
+                        placeholder="John Doe"
+                        placeholderTextColor={isDarkMode ? '#475569' : '#94a3b8'}
+                        value={values.name}
+                        onChangeText={handleChange('name')}
+                        onBlur={(e) => {
+                          handleBlur('name')(e);
+                          setFocusedField(null);
+                        }}
+                        onFocus={() => setFocusedField('name')}
+                        autoCapitalize="words"
+                      />
+                      {errors.name && touched.name && (
+                        <Text style={styles.errorText}>{errors.name}</Text>
+                      )}
+                    </View>
 
-          {/* Form Section */}
-          <Animated.View 
-            style={[
-              styles.formSection,
-              {
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }],
-              }
-            ]}
-          >
-            <Formik
-              initialValues={{
-                name: '',
-                email: '',
-                password: '',
-                confirmPassword: '',
-              }}
-              validationSchema={validationSchema}
-              onSubmit={handleRegister}
-            >
-              {({ handleChange, handleBlur, handleSubmit, values, errors, touched }) => (
-                <View style={styles.form}>
-                  {/* Name Field */}
-                  <View style={styles.inputContainer}>
-                    <TextInput
-                      style={[
-                        styles.input,
-                        errors.name && touched.name && styles.inputError
-                      ]}
-                      placeholder="Full Name"
-                      placeholderTextColor={placeholderColor}
-                      value={values.name}
-                      onChangeText={handleChange('name')}
-                      onBlur={handleBlur('name')}
-                      autoCapitalize="words"
-                      autoCorrect={false}
-                    />
-                    {errors.name && touched.name && (
-                      <Text style={styles.errorText}>{errors.name}</Text>
-                    )}
-                  </View>
+                    {/* Email Field */}
+                    <View style={styles.inputWrapper}>
+                      <Text style={[styles.inputLabel, dynamicStyles.inputLabel]}>Email</Text>
+                      <TextInput
+                        style={[
+                          styles.input,
+                          dynamicStyles.input,
+                          focusedField === 'email' && { borderColor: accentColor },
+                          errors.email && touched.email && styles.inputError
+                        ]}
+                        placeholder="name@email.com"
+                        placeholderTextColor={isDarkMode ? '#475569' : '#94a3b8'}
+                        value={values.email}
+                        onChangeText={handleChange('email')}
+                        onBlur={(e) => {
+                          handleBlur('email')(e);
+                          setFocusedField(null);
+                        }}
+                        onFocus={() => setFocusedField('email')}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                      />
+                      {errors.email && touched.email && (
+                        <Text style={styles.errorText}>{errors.email}</Text>
+                      )}
+                    </View>
 
-                  {/* Email Field */}
-                  <View style={styles.inputContainer}>
-                    <TextInput
-                      style={[
-                        styles.input,
-                        errors.email && touched.email && styles.inputError
-                      ]}
-                      placeholder="Email"
-                      placeholderTextColor={placeholderColor}
-                      value={values.email}
-                      onChangeText={handleChange('email')}
-                      onBlur={handleBlur('email')}
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                    {errors.email && touched.email && (
-                      <Text style={styles.errorText}>{errors.email}</Text>
-                    )}
-                  </View>
-
-                  {/* Password Field */}
-                  <View style={styles.inputContainer}>
-                    <TextInput
-                      style={[
-                        styles.input,
+                    {/* Password Field */}
+                    <View style={styles.inputWrapper}>
+                      <Text style={[styles.inputLabel, dynamicStyles.inputLabel]}>Password</Text>
+                      <View style={[
+                        styles.passwordContainer,
+                        dynamicStyles.input,
+                        focusedField === 'password' && { borderColor: accentColor },
                         errors.password && touched.password && styles.inputError
-                      ]}
-                      placeholder="Password"
-                      placeholderTextColor={placeholderColor}
-                      value={values.password}
-                      onChangeText={handleChange('password')}
-                      onBlur={handleBlur('password')}
-                      secureTextEntry
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                    {errors.password && touched.password && (
-                      <Text style={styles.errorText}>{errors.password}</Text>
-                    )}
-                  </View>
+                      ]}>
+                        <TextInput
+                          style={styles.passwordInput}
+                          placeholder="••••••••"
+                          placeholderTextColor={isDarkMode ? '#475569' : '#94a3b8'}
+                          value={values.password}
+                          onChangeText={handleChange('password')}
+                          onBlur={(e) => {
+                            handleBlur('password')(e);
+                            setFocusedField(null);
+                          }}
+                          onFocus={() => setFocusedField('password')}
+                          secureTextEntry={!showPassword}
+                          autoCapitalize="none"
+                        />
+                        <TouchableOpacity 
+                          style={styles.eyeButton}
+                          onPress={() => setShowPassword(!showPassword)}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons 
+                            name={showPassword ? "eye-off-outline" : "eye-outline"} 
+                            size={20} 
+                            color={isDarkMode ? '#94a3b8' : '#64748b'} 
+                          />
+                        </TouchableOpacity>
+                      </View>
+                      {errors.password && touched.password && (
+                        <Text style={styles.errorText}>{errors.password}</Text>
+                      )}
+                    </View>
 
-                  {/* Confirm Password Field */}
-                  <View style={styles.inputContainer}>
-                    <TextInput
-                      style={[
-                        styles.input,
+                    {/* Confirm Password Field */}
+                    <View style={styles.inputWrapper}>
+                      <Text style={[styles.inputLabel, dynamicStyles.inputLabel]}>Confirm Password</Text>
+                      <View style={[
+                        styles.passwordContainer,
+                        dynamicStyles.input,
+                        focusedField === 'confirmPassword' && { borderColor: accentColor },
                         errors.confirmPassword && touched.confirmPassword && styles.inputError
-                      ]}
-                      placeholder="Confirm Password"
-                      placeholderTextColor={placeholderColor}
-                      value={values.confirmPassword}
-                      onChangeText={handleChange('confirmPassword')}
-                      onBlur={handleBlur('confirmPassword')}
-                      secureTextEntry
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                    {errors.confirmPassword && touched.confirmPassword && (
-                      <Text style={styles.errorText}>{errors.confirmPassword}</Text>
-                    )}
-                  </View>
+                      ]}>
+                        <TextInput
+                          style={styles.passwordInput}
+                          placeholder="••••••••"
+                          placeholderTextColor={isDarkMode ? '#475569' : '#94a3b8'}
+                          value={values.confirmPassword}
+                          onChangeText={handleChange('confirmPassword')}
+                          onBlur={(e) => {
+                            handleBlur('confirmPassword')(e);
+                            setFocusedField(null);
+                          }}
+                          onFocus={() => setFocusedField('confirmPassword')}
+                          secureTextEntry={!showConfirmPassword}
+                          autoCapitalize="none"
+                        />
+                        <TouchableOpacity 
+                          style={styles.eyeButton}
+                          onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons 
+                            name={showConfirmPassword ? "eye-off-outline" : "eye-outline"} 
+                            size={20} 
+                            color={isDarkMode ? '#94a3b8' : '#64748b'} 
+                          />
+                        </TouchableOpacity>
+                      </View>
+                      {errors.confirmPassword && touched.confirmPassword && (
+                        <Text style={styles.errorText}>{errors.confirmPassword}</Text>
+                      )}
+                    </View>
 
-                  {/* Register Button */}
-                  <TouchableOpacity
-                    style={[styles.registerButton, isLoading && styles.buttonDisabled]}
-                    onPress={() => handleSubmit()}
-                    disabled={isLoading}
-                  >
-                    <Text style={styles.registerButtonText}>
-                      {isLoading ? 'Creating Account...' : 'Create Account'}
-                    </Text>
-                  </TouchableOpacity>
-
-                  {/* Social login removed for OTP-based signup */}
-
-                  {/* Login Link */}
-                  <View style={styles.loginContainer}>
-                    <Text style={styles.loginText}>Already have an account? </Text>
-                    <TouchableOpacity onPress={() => router.push('/login')}>
-                      <Text style={styles.loginLink}>Sign In</Text>
+                    <TouchableOpacity
+                      style={[styles.registerButton, dynamicStyles.registerButton, isLoading && styles.buttonDisabled]}
+                      onPress={() => handleSubmit()}
+                      activeOpacity={0.8}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <Text style={styles.registerButtonText}>Creating Account...</Text>
+                      ) : (
+                        <Text style={styles.registerButtonText}>Create Account</Text>
+                      )}
                     </TouchableOpacity>
                   </View>
-                </View>
-              )}
-            </Formik>
-          </Animated.View>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+                )}
+              </Formik>
+            </Animated.View>
+
+            {/* Footer */}
+            <Animated.View style={[styles.footer, { opacity: fadeAnim }]}>
+              <Text style={[styles.footerText, { color: isDarkMode ? '#64748b' : '#94a3b8' }]}>
+                Already have an account?{' '}
+              </Text>
+              <TouchableOpacity onPress={() => router.push('/login')}>
+                <Text style={[styles.loginLink, { color: accentColor }]}>Sign In</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      {/* Floating Theme Toggle for Testing */}
+      <TouchableOpacity 
+        style={[styles.floatingToggle, { backgroundColor: isDarkMode ? '#1e293b' : '#fff' }]} 
+        onPress={toggleTheme}
+        activeOpacity={0.8}
+      >
+        <Ionicons 
+          name={isDarkMode ? "sunny" : "moon"} 
+          size={24} 
+          color={isDarkMode ? "#fbbf24" : "#475569"} 
+        />
+      </TouchableOpacity>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
   scrollContent: {
     flexGrow: 1,
   },
-  background: {
+  inner: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
   },
-  headerSection: {
-    backgroundColor: '#20B2AA',
-    paddingTop: 60,
-    paddingBottom: 40,
-    paddingHorizontal: 30,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-  },
-  headerContent: {
+  headerContainer: {
     alignItems: 'center',
-  },
-  welcomeTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  welcomeSubtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
-    textAlign: 'center',
-    marginBottom: 30,
-  },
-  illustrationContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  illustration: {
-    fontSize: 60,
-    textAlign: 'center',
-  },
-  formSection: {
-    flex: 1,
-    paddingHorizontal: 30,
-    paddingTop: 40,
-  },
-  form: {
-    flex: 1,
-  },
-  inputContainer: {
     marginBottom: 20,
   },
+  logoCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    marginBottom: 8,
+  },
+  logoIconBg: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoEmoji: {
+    fontSize: 20,
+  },
+  brandText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 4,
+  },
+  titleContainer: {
+    alignItems: 'center',
+  },
+  titleText: {
+    fontSize: 32,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  accentLine: {
+    width: 40,
+    height: 3,
+    borderRadius: 2,
+    marginTop: 8,
+  },
+  formContainer: {
+    width: '100%',
+  },
+  form: {
+    width: '100%',
+  },
+  inputWrapper: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+    marginLeft: 4,
+  },
   input: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    height: 54,
+    borderRadius: 14,
+    paddingHorizontal: 18,
     fontSize: 16,
-    color: '#333',
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 54,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingRight: 8,
+  },
+  passwordInput: {
+    flex: 1,
+    height: '100%',
+    paddingHorizontal: 18,
+    fontSize: 16,
+    color: 'inherit',
+  },
+  eyeButton: {
+    padding: 10,
   },
   inputError: {
-    borderColor: '#ff4444',
+    borderColor: '#f43f5e',
   },
   errorText: {
-    color: '#ff4444',
+    color: '#f43f5e',
     fontSize: 12,
-    marginTop: 5,
+    marginTop: 4,
+    marginLeft: 4,
   },
   registerButton: {
-    backgroundColor: '#20B2AA',
-    borderRadius: 12,
-    paddingVertical: 16,
+    height: 56,
+    borderRadius: 16,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 30,
-    shadowColor: '#20B2AA',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+    marginTop: 12,
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowRadius: 12,
+    elevation: 6,
   },
   registerButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
   buttonDisabled: {
-    backgroundColor: '#ccc',
+    opacity: 0.7,
   },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#e0e0e0',
-  },
-  dividerText: {
-    marginHorizontal: 20,
-    fontSize: 14,
-    color: '#999',
-    fontWeight: '500',
-  },
-  socialContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 40,
-  },
-  socialButton: {
-    flex: 1,
-    backgroundColor: 'white',
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    marginHorizontal: 5,
-  },
-  socialIcon: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginRight: 8,
-  },
-  socialText: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
-  },
-  loginContainer: {
+  footer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 'auto',
-    paddingBottom: 30,
+    marginTop: 40,
+    paddingBottom: 20,
   },
-  loginText: {
-    fontSize: 16,
-    color: '#666',
+  footerText: {
+    fontSize: 15,
   },
   loginLink: {
-    fontSize: 16,
-    color: '#20B2AA',
-    fontWeight: 'bold',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  floatingToggle: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
   },
 });
