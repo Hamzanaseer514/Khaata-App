@@ -3,6 +3,7 @@ import { useTheme } from '@/contexts/DarkModeContext';
 import { Colors } from '@/constants/theme';
 import { showError, showSuccess } from '@/utils/toast';
 import { router, useLocalSearchParams } from 'expo-router';
+import { goBack } from '@/utils/navigation';
 import { Formik } from 'formik';
 import React, { useState, useRef, useEffect } from 'react';
 import {
@@ -22,6 +23,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Yup from 'yup';
 import * as ImagePicker from 'expo-image-picker';
+import * as Contacts from 'expo-contacts';
 import { Image } from 'expo-image';
 import config from '../../config/config';
 
@@ -61,6 +63,7 @@ export default function AddContactScreen() {
   const accentColor = isDarkMode ? '#22d3ee' : '#0a7ea4';
   const placeholderColor = isDarkMode ? '#475569' : '#94a3b8';
 
+  const formikRef = useRef<any>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
@@ -145,6 +148,48 @@ export default function AddContactScreen() {
     }
   };
 
+  const importFromContacts = async () => {
+    const { status } = await Contacts.requestPermissionsAsync();
+    if (status !== 'granted') {
+      showError('Permission to access contacts is required');
+      return;
+    }
+
+    const { data } = await Contacts.getContactsAsync({
+      fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers, Contacts.Fields.Emails, Contacts.Fields.Image],
+    });
+
+    if (!data || data.length === 0) {
+      showError('No contacts found on this device');
+      return;
+    }
+
+    // Present contact picker using expo-contacts presentContactPickerAsync if available,
+    // otherwise use a simple approach - pick first match or show list
+    try {
+      const contact = await Contacts.presentContactPickerAsync();
+      if (contact) {
+        const name = contact.name || '';
+        const phone = contact.phoneNumbers?.[0]?.number?.replace(/[\s\-()]/g, '') || '';
+        const email = contact.emails?.[0]?.email || '';
+
+        if (formikRef.current) {
+          formikRef.current.setFieldValue('name', name);
+          if (phone) formikRef.current.setFieldValue('phone', phone);
+          if (email) formikRef.current.setFieldValue('email', email);
+        }
+
+        if (contact.image?.uri) {
+          setProfileImage(contact.image.uri);
+        }
+      }
+    } catch {
+      // presentContactPickerAsync not available on this platform, fallback
+      // Just open contacts and pick the first one with a name
+      showError('Contact picker not supported, please enter details manually');
+    }
+  };
+
   const handleFormSubmit = async (values: {
     name: string;
     email: string;
@@ -172,7 +217,7 @@ export default function AddContactScreen() {
 
       if (data.success) {
         showSuccess(isEdit ? 'Contact updated successfully!' : 'Contact added successfully!');
-        router.back();
+        goBack();
       } else {
         showError(data.message || `Failed to ${isEdit ? 'update' : 'add'} contact`);
       }
@@ -266,16 +311,25 @@ export default function AddContactScreen() {
             {/* Compact Header */}
             <View style={dynamicStyles.headerBackground}>
               <TouchableOpacity 
-                onPress={() => router.back()}
+                onPress={() => goBack()}
                 hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
               >
                 <Ionicons name="chevron-back" size={28} color="#ffffff" />
               </TouchableOpacity>
               
               <Text style={dynamicStyles.headerTitle}>{isEdit ? 'Edit Contact' : 'Add Contact'}</Text>
-              
-              {/* Empty view for spacing if needed, or just keep it simple */}
-              <View style={{ width: 28 }} />
+
+              {!isEdit && (
+                <TouchableOpacity
+                  onPress={importFromContacts}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 }}
+                >
+                  <Ionicons name="phone-portrait-outline" size={16} color="#ffffff" />
+                  <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '600' }}>Import</Text>
+                </TouchableOpacity>
+              )}
+              {isEdit && <View style={{ width: 28 }} />}
             </View>
 
             {/* Main Page Title (Outside Header) */}
@@ -335,6 +389,7 @@ export default function AddContactScreen() {
               ]}
             >
               <Formik
+                innerRef={formikRef}
                 initialValues={initialValues}
                 validationSchema={validationSchema}
                 onSubmit={handleFormSubmit}

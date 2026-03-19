@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, usePathname } from 'expo-router';
@@ -7,37 +7,41 @@ import config from '@/config/config';
 
 const { LIGHT_COLORS, DARK_COLORS } = config;
 
-export default function BottomNav() {
+const NAV_ITEMS = [
+  { icon: 'settings-outline', activeIcon: 'settings', label: 'Settings', path: '/settings' },
+  { icon: 'people-outline', activeIcon: 'people', label: 'Contacts', path: '/contacts' },
+  { icon: 'home-outline', activeIcon: 'home', label: 'Home', path: '/dashboard', isCenter: true },
+  { icon: 'restaurant-outline', activeIcon: 'restaurant', label: 'Mess', path: '/mess' },
+  { icon: 'wallet-outline', activeIcon: 'wallet', label: 'Khaata', path: '/personal-khaata' },
+];
+
+function BottomNav() {
   const { isDarkMode } = useTheme();
   const COLORS = isDarkMode ? DARK_COLORS : LIGHT_COLORS;
   const pathname = usePathname();
+  const activeColor = isDarkMode ? COLORS.primary : '#0a7ea4';
 
-  const isActive = (path: string) => pathname === path;
-
-  const navItems = [
-    { icon: 'settings-outline', activeIcon: 'settings', label: 'Settings', path: '/settings' },
-    { icon: 'time-outline', activeIcon: 'time', label: 'History', path: '/reports' },
-    { icon: 'home-outline', activeIcon: 'home', label: 'Home', path: '/dashboard', isCenter: true },
-    { icon: 'people-outline', activeIcon: 'people', label: 'Contacts', path: '/contacts' },
-    { icon: 'restaurant-outline', activeIcon: 'restaurant', label: 'Mess', path: '/mess' },
-  ];
+  const navigate = useCallback((path: string) => {
+    if (pathname === path) return; // already on this page
+    router.replace(path as any);
+  }, [pathname]);
 
   return (
     <View style={styles.container}>
       <View style={[styles.navBar, { backgroundColor: isDarkMode ? 'rgba(22, 22, 26, 0.95)' : 'rgba(255, 255, 255, 0.95)' }]}>
-        {navItems.map((item, index) => {
-          const active = isActive(item.path);
+        {NAV_ITEMS.map((item, index) => {
+          const active = pathname === item.path;
           if (item.isCenter) {
             return (
               <View key={index} style={styles.centerButtonContainer}>
                 <TouchableOpacity
-                  style={[styles.centerButton, { backgroundColor: COLORS.primary }]}
-                  onPress={() => router.push(item.path as any)}
+                  style={[styles.centerButton, { backgroundColor: activeColor }]}
+                  onPress={() => navigate(item.path)}
                   activeOpacity={0.8}
                 >
                   <Ionicons name={active ? item.activeIcon as any : item.icon as any} size={30} color="#FFFFFF" />
                 </TouchableOpacity>
-                <Text style={[styles.navLabel, { color: active ? COLORS.primary : COLORS.textMuted }]}>
+                <Text style={[styles.navLabel, { color: active ? activeColor : COLORS.textMuted }]}>
                   {item.label}
                 </Text>
               </View>
@@ -48,15 +52,15 @@ export default function BottomNav() {
             <TouchableOpacity
               key={index}
               style={styles.navItem}
-              onPress={() => router.push(item.path as any)}
+              onPress={() => navigate(item.path)}
               activeOpacity={0.6}
             >
               <Ionicons
                 name={active ? item.activeIcon as any : item.icon as any}
                 size={24}
-                color={active ? COLORS.primary : COLORS.textMuted}
+                color={active ? activeColor : COLORS.textMuted}
               />
-              <Text style={[styles.navLabel, { color: active ? COLORS.primary : COLORS.textMuted }]}>
+              <Text style={[styles.navLabel, { color: active ? activeColor : COLORS.textMuted }]}>
                 {item.label}
               </Text>
             </TouchableOpacity>
@@ -66,6 +70,8 @@ export default function BottomNav() {
     </View>
   );
 }
+
+export default React.memo(BottomNav);
 
 const styles = StyleSheet.create({
   container: {

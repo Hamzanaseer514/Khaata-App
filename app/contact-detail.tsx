@@ -1,6 +1,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/DarkModeContext';
 import { showError, showSuccess } from '@/utils/toast';
+import { goBack } from '@/utils/navigation';
 import * as FileSystem from 'expo-file-system/legacy';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
@@ -601,7 +602,7 @@ export default function ContactDetailScreen() {
       fetchTransactions();
     } else {
       showError('Invalid contact ID');
-      router.back();
+      goBack();
     }
   }, [actualContactId]);
 
@@ -647,11 +648,11 @@ export default function ContactDetailScreen() {
         setContact(data.data);
       } else {
         showError(data.message || 'Failed to fetch contact details');
-        router.back();
+        goBack();
       }
     } catch (error) {
       showError('Failed to fetch contact details');
-      router.back();
+      goBack();
     }
   };
 
@@ -757,15 +758,15 @@ export default function ContactDetailScreen() {
   const renderTransaction = ({ item, index }: { item: Transaction, index: number }) => {
     const isUserPaid = item.payer === 'USER';
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
+        key={item.id || index}
         activeOpacity={0.7}
         onPress={() => {
           setEditingTransaction(item);
           setShowAddTransaction(true);
         }}
       >
-        <Animated.View 
-          key={item.id || index}
+        <Animated.View
           style={[
             styles.transactionCard,
             {
@@ -838,7 +839,7 @@ export default function ContactDetailScreen() {
       <StatusBar barStyle="light-content" />
       {/* Header */}
       <Animated.View style={[styles.header, { transform: [{ translateY: headerTranslateY }] }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => goBack()}>
           <Ionicons name="chevron-back" size={28} color="#ffffff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>Contact Details</Text>

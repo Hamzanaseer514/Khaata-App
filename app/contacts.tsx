@@ -1,6 +1,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { showError } from '@/utils/toast';
 import { router, useFocusEffect } from 'expo-router';
+import { goBack } from '@/utils/navigation';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -445,7 +446,7 @@ export default function ContactsListScreen() {
       {/* Premium Header */}
       <View style={dynamicStyles.headerBackground}>
         <TouchableOpacity 
-          onPress={() => router.back()}
+          onPress={() => goBack()}
           hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
         >
           <Ionicons name="chevron-back" size={28} color="#ffffff" />

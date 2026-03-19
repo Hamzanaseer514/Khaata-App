@@ -4,7 +4,7 @@
     "slug": "khaata-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/khaataicon.png",
+    "icon": "./assets/images/khaatawise_dark.png",
     "scheme": "khaataapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
@@ -16,26 +16,27 @@
       "package": "com.khaata.app",
       "appName": "KhaataWise",
       "adaptiveIcon": {
-        "backgroundColor": "#20B2AA"
+        "foregroundImage": "./assets/images/khaatawise_dark.png",
+        "backgroundColor": "#0a0a0c"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/khaataicon.png"
+      "favicon": "./assets/images/khaatawise_dark.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/khaataicon.png",
+          "image": "./assets/images/khaatawise_dark.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#0a0a0c",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#0a0a0c"
           }
         }
       ]

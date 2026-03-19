@@ -1,417 +1,162 @@
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useTheme } from '@/contexts/DarkModeContext';
+import config from '@/config/config';
 import { showError } from '@/utils/toast';
-import { router } from 'expo-router';
-import React, { useRef, useState } from 'react';
-import {
-  Animated,
-  Linking,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { goBack } from '@/utils/navigation';
+import React, { useState } from 'react';
+import { Linking, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function ContactSupportScreen() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
+  const { isDarkMode } = useTheme();
+  const COLORS = isDarkMode ? config.DARK_COLORS : config.LIGHT_COLORS;
+  const accent = isDarkMode ? '#22d3ee' : '#0a7ea4';
+  const cardBg = isDarkMode ? COLORS.surface : '#ffffff';
+  const inputBg = isDarkMode ? COLORS.background : '#f8fafc';
+  const borderColor = isDarkMode ? 'rgba(255,255,255,0.06)' : '#f1f5f9';
   const [message, setMessage] = useState('');
-  const placeholderColor = isDark ? '#6b7280' : '#9ca3af';
-
-  React.useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 1000,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
 
   const handleWhatsApp = () => {
-    const phoneNumber = '03274025364';
-    const defaultMessage = message || 'Hello! I need help with Khaata app.';
-    const url = `whatsapp://send?phone=${phoneNumber}&text=${encodeURIComponent(defaultMessage)}`;
-    Linking.openURL(url);
+    const msg = message || 'Hello! I need help with Khaata app.';
+    Linking.openURL(`whatsapp://send?phone=03274025364&text=${encodeURIComponent(msg)}`).catch(() => showError('WhatsApp not installed'));
   };
-
   const handleEmail = () => {
-    const email = 'khaataapp.co@gmail.com';
-    const subject = 'Khaata App - Support Request';
-    const body = message || 'Hello,\n\nI need assistance with the following:\n\n';
-    const url = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    Linking.openURL(url);
+    const body = message || 'Hello,\n\nI need assistance with:\n\n';
+    Linking.openURL(`mailto:khaataapp.co@gmail.com?subject=${encodeURIComponent('Khaata Support')}&body=${encodeURIComponent(body)}`).catch(() => showError('Unable to open email'));
   };
+  const handleCall = () => { Linking.openURL('tel:03274025364'); };
 
-  const handleCall = () => {
-    const phoneNumber = '03274025364';
-    const url = `tel:${phoneNumber}`;
-    Linking.openURL(url);
-  };
-
-  const handleSubmitMessage = () => {
-    if (!message.trim()) {
-      showError('Please enter your message before sending.');
-      return;
-    }
-
-    // For simplicity, default to email; UI can add buttons for choices
+  const handleSend = () => {
+    if (!message.trim()) { showError('Please enter your message'); return; }
     handleEmail();
   };
 
+  const CONTACTS = [
+    { icon: 'logo-whatsapp' as const, color: '#25D366', title: 'WhatsApp', sub: '03274025364', desc: 'Quick responses', onPress: handleWhatsApp },
+    { icon: 'mail-outline' as const, color: accent, title: 'Email', sub: 'khaataapp.co@gmail.com', desc: 'Detailed support', onPress: handleEmail },
+    { icon: 'call-outline' as const, color: isDarkMode ? '#34d399' : '#10b981', title: 'Phone', sub: '03274025364', desc: 'Direct voice support', onPress: handleCall },
+  ];
+
+  const FAQS = [
+    { q: 'How do I reset my password?', a: 'Go to Settings → Change Password. If locked out, contact us directly.' },
+    { q: 'How do I add a new contact?', a: 'Navigate to Contacts → tap + button and enter the person\'s details.' },
+    { q: 'How do I create a group transaction?', a: 'Go to Group Khaata → Create, add members, and start tracking shared expenses.' },
+    { q: 'Is my financial data secure?', a: 'Yes, we use industry-standard encryption. See our Privacy Policy for details.' },
+  ];
+
   return (
-    <ScrollView style={styles.container}>
-      {/* Header */}
-      <Animated.View
-        style={[
-          styles.header,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          }
-        ]}
-      >
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backText}>‹ Back</Text>
+    <View style={[styles.container, { backgroundColor: COLORS.background }]}>
+      <StatusBar barStyle="light-content" />
+      <View style={[styles.header, { backgroundColor: isDarkMode ? '#1c1e1f' : accent, borderBottomWidth: isDarkMode ? 1 : 0, borderColor: 'rgba(34,211,238,0.2)' }]}>
+        <TouchableOpacity onPress={() => goBack()} hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
+          <Ionicons name="chevron-back" size={28} color="#ffffff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Contact Support</Text>
-        <View style={styles.headerSpacer} />
-      </Animated.View>
+        <View style={{ width: 28 }} />
+      </View>
 
-      <Animated.View
-        style={[
-          styles.content,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          }
-        ]}
-      >
-        {/* Introduction */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Get Help</Text>
-          <Text style={styles.sectionText}>
-            We're here to help! If you're experiencing any issues with Khaata or have questions about using the app, please don't hesitate to reach out to us. Our support team is available to assist you.
-          </Text>
+      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+
+        {/* Intro */}
+        <View style={[styles.introCard, { backgroundColor: isDarkMode ? 'rgba(34,211,238,0.06)' : '#f0f9ff', borderColor: isDarkMode ? 'rgba(34,211,238,0.15)' : '#bae6fd' }]}>
+          <Ionicons name="headset-outline" size={28} color={accent} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.introTitle, { color: COLORS.text }]}>We're here to help!</Text>
+            <Text style={[styles.introDesc, { color: COLORS.textMuted }]}>Reach out via any channel below. We typically respond within 24 hours.</Text>
+          </View>
         </View>
 
         {/* Contact Methods */}
-        <View style={styles.contactSection}>
-          <Text style={styles.sectionTitle}>Contact Methods</Text>
-
-          <TouchableOpacity style={styles.contactMethod} onPress={handleWhatsApp}>
-            <View style={styles.contactIconContainer}>
-              <Text style={styles.contactIcon}>📱</Text>
-            </View>
-            <View style={styles.contactInfo}>
-              <Text style={styles.contactTitle}>WhatsApp</Text>
-              <Text style={styles.contactSubtitle}>03274025364</Text>
-              <Text style={styles.contactDescription}>Quick responses, best for urgent issues</Text>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.contactMethod} onPress={handleEmail}>
-            <View style={styles.contactIconContainer}>
-              <Text style={styles.contactIcon}>📧</Text>
-            </View>
-            <View style={styles.contactInfo}>
-              <Text style={styles.contactTitle}>Email</Text>
-              <Text style={styles.contactSubtitle}>khaataapp.co@gmail.com</Text>
-              <Text style={styles.contactDescription}>Detailed support, best for complex issues</Text>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.contactMethod} onPress={handleCall}>
-            <View style={styles.contactIconContainer}>
-              <Text style={styles.contactIcon}>📞</Text>
-            </View>
-            <View style={styles.contactInfo}>
-              <Text style={styles.contactTitle}>Phone Call</Text>
-              <Text style={styles.contactSubtitle}>03274025364</Text>
-              <Text style={styles.contactDescription}>Direct voice support</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Message Form */}
-        <View style={styles.messageSection}>
-          <Text style={styles.sectionTitle}>Send a Message</Text>
-          <Text style={styles.sectionText}>
-            Describe your issue or question below, and we'll help you resolve it quickly.
-          </Text>
-
-          <View style={styles.messageContainer}>
-            <TextInput
-              style={styles.messageInput}
-              placeholder="Describe your issue or question here..."
-              placeholderTextColor={placeholderColor}
-              value={message}
-              onChangeText={setMessage}
-              multiline
-              numberOfLines={6}
-              textAlignVertical="top"
-            />
-
-            <TouchableOpacity style={styles.sendButton} onPress={handleSubmitMessage}>
-              <Text style={styles.sendButtonText}>Send Message</Text>
+        <Text style={[styles.sectionLabel, { color: COLORS.textMuted }]}>CONTACT METHODS</Text>
+        <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
+          {CONTACTS.map((c, i) => (
+            <TouchableOpacity key={i} style={[styles.contactRow, i < CONTACTS.length - 1 && { borderBottomWidth: 1, borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.04)' : '#f8fafc' }]} onPress={c.onPress} activeOpacity={0.7}>
+              <View style={[styles.contactIcon, { backgroundColor: `${c.color}15` }]}>
+                <Ionicons name={c.icon} size={22} color={c.color} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.contactTitle, { color: COLORS.text }]}>{c.title}</Text>
+                <Text style={[styles.contactSub, { color: c.color }]}>{c.sub}</Text>
+                <Text style={[styles.contactDesc, { color: COLORS.textMuted }]}>{c.desc}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={isDarkMode ? '#475569' : '#cbd5e1'} />
             </TouchableOpacity>
-          </View>
+          ))}
         </View>
 
-        {/* FAQ Section */}
-        <View style={styles.faqSection}>
-          <Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
-
-          <View style={styles.faqItem}>
-            <Text style={styles.faqQuestion}>How do I reset my password?</Text>
-            <Text style={styles.faqAnswer}>
-              Go to Settings → Change Password and follow the instructions. If you're locked out, contact us directly.
-            </Text>
-          </View>
-
-          <View style={styles.faqItem}>
-            <Text style={styles.faqQuestion}>How do I add a new contact?</Text>
-            <Text style={styles.faqAnswer}>
-              Navigate to Contacts → Add Contact and enter the person's details. You can also import from your phone's contacts.
-            </Text>
-          </View>
-
-          <View style={styles.faqItem}>
-            <Text style={styles.faqQuestion}>How do I create a group transaction?</Text>
-            <Text style={styles.faqAnswer}>
-              Go to Group Khaata → Create Group, add members, and start tracking shared expenses and payments.
-            </Text>
-          </View>
-
-          <View style={styles.faqItem}>
-            <Text style={styles.faqQuestion}>Is my financial data secure?</Text>
-            <Text style={styles.faqAnswer}>
-              Yes, we use industry-standard encryption and security measures to protect your data. See our Privacy Policy for details.
-            </Text>
-          </View>
+        {/* Message */}
+        <Text style={[styles.sectionLabel, { color: COLORS.textMuted }]}>SEND A MESSAGE</Text>
+        <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
+          <TextInput
+            style={[styles.msgInput, { backgroundColor: inputBg, borderColor, color: COLORS.text }]}
+            placeholder="Describe your issue or question..."
+            placeholderTextColor={COLORS.textMuted}
+            value={message}
+            onChangeText={setMessage}
+            multiline
+            numberOfLines={5}
+            textAlignVertical="top"
+          />
+          <TouchableOpacity style={[styles.sendBtn, { backgroundColor: accent }]} onPress={handleSend}>
+            <Ionicons name="send" size={18} color={isDarkMode ? '#0a0a0c' : '#fff'} />
+            <Text style={[styles.sendBtnText, { color: isDarkMode ? '#0a0a0c' : '#fff' }]}>Send via Email</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Response Time */}
-        <View style={styles.responseSection}>
-          <Text style={styles.sectionTitle}>Response Times</Text>
-          <Text style={styles.sectionText}>
-            We aim to respond to all inquiries within 24 hours. WhatsApp messages typically receive faster responses during business hours (9 AM - 6 PM PKT).
-          </Text>
+        {/* FAQ */}
+        <Text style={[styles.sectionLabel, { color: COLORS.textMuted }]}>FREQUENTLY ASKED</Text>
+        <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
+          {FAQS.map((faq, i) => (
+            <View key={i} style={[styles.faqItem, i < FAQS.length - 1 && { borderBottomWidth: 1, borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.04)' : '#f8fafc' }]}>
+              <View style={styles.faqQRow}>
+                <Ionicons name="help-circle" size={18} color={accent} />
+                <Text style={[styles.faqQ, { color: COLORS.text }]}>{faq.q}</Text>
+              </View>
+              <Text style={[styles.faqA, { color: COLORS.textMuted }]}>{faq.a}</Text>
+            </View>
+          ))}
         </View>
 
         {/* Footer */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Thank you for using Khaata! We appreciate your feedback and are committed to providing excellent support.
-          </Text>
+        <View style={[styles.footerCard, { backgroundColor: isDarkMode ? 'rgba(34,197,94,0.06)' : '#f0fdf4', borderColor: isDarkMode ? 'rgba(34,197,94,0.15)' : '#bbf7d0' }]}>
+          <Ionicons name="heart" size={18} color={isDarkMode ? '#34d399' : '#10b981'} />
+          <Text style={[styles.footerText, { color: COLORS.textMuted }]}>Thank you for using Khaata! We appreciate your feedback.</Text>
         </View>
-      </Animated.View>
-    </ScrollView>
+
+        <View style={{ height: 30 }} />
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-    backgroundColor: '#20B2AA',
-  },
-  backButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  backText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  headerSpacer: {
-    width: 60,
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-  },
-  section: {
-    marginBottom: 30,
-  },
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    marginBottom: 15,
-  },
-  sectionText: {
-    fontSize: 15,
-    color: '#555',
-    lineHeight: 24,
-    textAlign: 'justify',
-  },
-  contactSection: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 30,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  contactMethod: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 15,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    marginBottom: 10,
-    backgroundColor: '#f8f9fa',
-  },
-  contactIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#20B2AA',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 15,
-  },
-  contactIcon: {
-    fontSize: 24,
-  },
-  contactInfo: {
-    flex: 1,
-  },
-  contactTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#2c3e50',
-    marginBottom: 2,
-  },
-  contactSubtitle: {
-    fontSize: 16,
-    color: '#20B2AA',
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  contactDescription: {
-    fontSize: 14,
-    color: '#666',
-  },
-  messageSection: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 30,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  messageContainer: {
-    marginTop: 15,
-  },
-  messageInput: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 15,
-    fontSize: 15,
-    color: '#333',
-    backgroundColor: '#f8f9fa',
-    minHeight: 120,
-    marginBottom: 15,
-  },
-  sendButton: {
-    backgroundColor: '#20B2AA',
-    borderRadius: 8,
-    paddingVertical: 15,
-    alignItems: 'center',
-  },
-  sendButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  faqSection: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 30,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  faqItem: {
-    marginBottom: 20,
-    paddingBottom: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  faqQuestion: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2c3e50',
-    marginBottom: 8,
-  },
-  faqAnswer: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
-  },
-  responseSection: {
-    backgroundColor: '#e8f5e8',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 30,
-    borderLeftWidth: 4,
-    borderLeftColor: '#20B2AA',
-  },
-  footer: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 40,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  footerText: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
+  container: { flex: 1 },
+  header: { paddingTop: 60, paddingBottom: 20, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 5 },
+  headerTitle: { color: '#ffffff', fontSize: 18, fontWeight: '700' },
+  body: { padding: 20 },
+
+  introCard: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 14, borderWidth: 1, marginBottom: 20 },
+  introTitle: { fontSize: 16, fontWeight: '700' },
+  introDesc: { fontSize: 13, lineHeight: 18, marginTop: 2 },
+
+  sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginBottom: 8, marginTop: 4 },
+
+  card: { borderRadius: 14, borderWidth: 1, marginBottom: 16, overflow: 'hidden' },
+
+  contactRow: { flexDirection: 'row', alignItems: 'center', padding: 16 },
+  contactIcon: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
+  contactTitle: { fontSize: 15, fontWeight: '700' },
+  contactSub: { fontSize: 13, fontWeight: '600', marginTop: 1 },
+  contactDesc: { fontSize: 11, marginTop: 2 },
+
+  msgInput: { margin: 14, borderRadius: 12, borderWidth: 1, padding: 14, fontSize: 15, minHeight: 110 },
+  sendBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginHorizontal: 14, marginBottom: 14, paddingVertical: 14, borderRadius: 12 },
+  sendBtnText: { fontSize: 15, fontWeight: '700' },
+
+  faqItem: { padding: 16 },
+  faqQRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  faqQ: { fontSize: 14, fontWeight: '700', flex: 1 },
+  faqA: { fontSize: 13, lineHeight: 19, paddingLeft: 26 },
+
+  footerCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderRadius: 12, borderWidth: 1 },
+  footerText: { flex: 1, fontSize: 13, fontStyle: 'italic' },
 });

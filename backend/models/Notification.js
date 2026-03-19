@@ -9,8 +9,17 @@ const notificationSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: false,
+    default: null
   },
+  isBroadcast: {
+    type: Boolean,
+    default: false
+  },
+  readBy: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
   contactId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Contact',
@@ -55,5 +64,6 @@ notificationSchema.index({ userId: 1, createdAt: -1 });
 notificationSchema.index({ status: 1 });
 notificationSchema.index({ transactionId: 1 });
 notificationSchema.index({ userId: 1, type: 1, isRead: 1 });
+notificationSchema.index({ isBroadcast: 1, type: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Notification', notificationSchema);

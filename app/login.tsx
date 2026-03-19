@@ -256,7 +256,7 @@ export default function LoginScreen() {
                         errors.password && touched.password && styles.inputError
                       ]}>
                         <TextInput
-                          style={styles.passwordInput}
+                          style={[styles.passwordInput, { color: themeColors.text }]}
                           placeholder="••••••••"
                           placeholderTextColor={isDarkMode ? '#475569' : '#94a3b8'}
                           value={values.password}

@@ -277,7 +277,7 @@ router.get('/', authenticateToken, async (req, res) => {
 
     const groupTransactions = await GroupTransaction.find({ userId })
       .populate('payerId', 'name phone email')
-      .populate('contactIds', 'name phone email')
+      .populate('contactIds', 'name phone email profilePicture')
       .sort({ createdAt: -1 });
 
     // Transform the data to match frontend expectations
@@ -309,6 +309,7 @@ router.get('/', authenticateToken, async (req, res) => {
         payerName: transaction.payerId ? transaction.payerId.name : 'You',
         contactIds: contactIdsAsStrings,
         contactNames: transaction.contactIds.map(contact => contact.name),
+        contactProfilePictures: transaction.contactIds.map(contact => contact.profilePicture || null),
         totalAmount: transaction.totalAmount,
         perPersonShare: transaction.perPersonShare,
         description: transaction.description,

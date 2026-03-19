@@ -49,6 +49,7 @@ function RootLayoutContent() {
             <Stack.Screen name="privacy-policy" options={{ headerShown: false }} />
             <Stack.Screen name="terms-of-service" options={{ headerShown: false }} />
             <Stack.Screen name="contact-support" options={{ headerShown: false }} />
+            <Stack.Screen name="admin-alerts" options={{ headerShown: false, presentation: 'transparentModal', animation: 'fade' }} />
             <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
           </Stack>
         </AuthWrapper>

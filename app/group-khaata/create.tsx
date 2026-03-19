@@ -1,690 +1,415 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useTheme } from '@/contexts/DarkModeContext';
 import { showError, showSuccess } from '@/utils/toast';
 import { router } from 'expo-router';
+import { goBack } from '@/utils/navigation';
 import React, { useEffect, useState } from 'react';
 import {
-    FlatList,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  FlatList,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import config from '../../config/config';
 
 interface Contact {
   _id: string;
-  id?: string; // For compatibility
+  id?: string;
   name: string;
   phone: string;
   email?: string;
+  profilePicture?: string | null;
 }
 
 export default function CreateGroupTransactionScreen() {
   const { token } = useAuth();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const { isDarkMode } = useTheme();
+  const COLORS = isDarkMode ? config.DARK_COLORS : config.LIGHT_COLORS;
+  const accent = isDarkMode ? '#22d3ee' : '#0a7ea4';
+  const cardBg = isDarkMode ? COLORS.surface : '#ffffff';
+  const inputBg = isDarkMode ? COLORS.background : '#f8fafc';
+  const borderColor = isDarkMode ? 'rgba(255,255,255,0.06)' : '#e2e8f0';
+
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
-  const [totalAmount, setTotalAmount] = useState<string>('');
-  const [description, setDescription] = useState<string>('');
+  const [totalAmount, setTotalAmount] = useState('');
+  const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [splitMode, setSplitMode] = useState<'equal' | 'manual'>('equal');
-  const [manualAmounts, setManualAmounts] = useState<{[contactId: string]: string}>({});
-  const [userAmount, setUserAmount] = useState<string>('');
-  const placeholderColor = isDark ? '#6b7280' : '#9ca3af';
+  const [manualAmounts, setManualAmounts] = useState<{ [contactId: string]: string }>({});
+  const [userAmount, setUserAmount] = useState('');
 
-
-
-  useEffect(() => {
-    fetchContacts();
-  }, []);
+  useEffect(() => { fetchContacts(); }, []);
 
   const fetchContacts = async () => {
     try {
       const response = await fetch(`${config.BASE_URL}/contacts`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       });
-
       const data = await response.json();
-
-      if (data.success) {
-        console.log('=== FRONTEND: Fetched contacts ===');
-        console.log('Contacts data:', data.data);
-        data.data.forEach((contact: Contact, index: number) => {
-          console.log(`Contact ${index}:`, {
-            _id: contact._id,
-            id: contact.id,
-            name: contact.name,
-            phone: contact.phone
-          });
-        });
-        setContacts(data.data);
-      } else {
-        showError(data.message || 'Failed to fetch contacts');
-      }
+      if (data.success) setContacts(data.data);
+      else showError(data.message || 'Failed to fetch contacts');
     } catch (error) {
       console.error('Error fetching contacts:', error);
       showError('Failed to fetch contacts');
     }
   };
 
-  const toggleContactSelection = (contactId: string) => {
-    setSelectedContacts(prev => {
-      if (prev.includes(contactId)) {
-        return prev.filter(id => id !== contactId);
-      } else {
-        return [...prev, contactId];
-      }
-    });
+  const toggleContact = (id: string) => {
+    setSelectedContacts(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]);
   };
 
-  const updateManualAmount = (contactId: string, amount: string) => {
-    setManualAmounts(prev => ({
-      ...prev,
-      [contactId]: amount
-    }));
+  const updateManualAmount = (id: string, amount: string) => {
+    setManualAmounts(prev => ({ ...prev, [id]: amount }));
   };
 
   const getTotalManualAmount = () => {
-    const contactTotal = Object.values(manualAmounts).reduce((sum, amount) => {
-      return sum + (parseFloat(amount) || 0);
-    }, 0);
-    const userTotal = parseFloat(userAmount) || 0;
-    return contactTotal + userTotal;
+    const contactTotal = Object.values(manualAmounts).reduce((s, a) => s + (parseFloat(a) || 0), 0);
+    return contactTotal + (parseFloat(userAmount) || 0);
   };
 
-  const isManualAmountValid = () => {
-    const totalManual = getTotalManualAmount();
-    const totalAmountNum = parseFloat(totalAmount) || 0;
-    return Math.abs(totalManual - totalAmountNum) < 0.01; // Allow small rounding differences
+  const isManualValid = () => Math.abs(getTotalManualAmount() - (parseFloat(totalAmount) || 0)) < 0.01;
+
+  const perPersonShare = () => {
+    const amt = parseFloat(totalAmount);
+    const count = selectedContacts.length + 1;
+    return amt > 0 && count > 0 ? (amt / count).toFixed(2) : '0.00';
   };
 
-
-  const calculatePerPersonShare = () => {
-    const amount = parseFloat(totalAmount);
-    const memberCount = selectedContacts.length + 1; // include You
-    if (amount > 0 && memberCount > 0) {
-      return (amount / memberCount).toFixed(2);
-    }
-    return '0.00';
-  };
+  const canSubmit = selectedContacts.length >= 1 && totalAmount && parseFloat(totalAmount) > 0 && description.trim() && (splitMode === 'equal' || isManualValid());
 
   const handleSubmit = async () => {
-    // Validation
-    if (selectedContacts.length < 1) {
-      showError('Please select at least 1 contact for group transaction');
-      return;
-    }
-
-    if (!totalAmount || parseFloat(totalAmount) <= 0) {
-      showError('Please enter a valid total amount');
-      return;
-    }
-
-    if (!description.trim()) {
-      showError('Please enter a description');
-      return;
-    }
-
-    // Additional validation for manual mode
-    if (splitMode === 'manual' && !isManualAmountValid()) {
-      showError(`Manual amounts total (Rs ${getTotalManualAmount().toFixed(2)}) must equal the total amount (Rs ${totalAmount})`);
-      return;
-    }
-
+    if (!canSubmit) return;
     setLoading(true);
-
     try {
-      console.log('=== SUBMIT GROUP TRANSACTION ===');
-      console.log('Selected Contacts:', selectedContacts);
-      console.log('Total Amount:', parseFloat(totalAmount));
-      console.log('Description:', description.trim());
-      console.log('Split Mode:', splitMode);
-      console.log('Manual Amounts:', manualAmounts);
-
-      const requestBody: any = {
-        payerId: 'USER', // You are paying
-        contactIds: selectedContacts,
-        totalAmount: parseFloat(totalAmount),
-        description: description.trim(),
-        splitMode: splitMode,
+      const body: any = {
+        payerId: 'USER', contactIds: selectedContacts,
+        totalAmount: parseFloat(totalAmount), description: description.trim(), splitMode,
       };
-
-      // Add individual amounts if manual mode
       if (splitMode === 'manual') {
-        requestBody.individualAmounts = {};
-        selectedContacts.forEach(contactId => {
-          requestBody.individualAmounts[contactId] = parseFloat(manualAmounts[contactId] || '0');
-        });
-        requestBody.userAmount = parseFloat(userAmount) || 0;
+        body.individualAmounts = {};
+        selectedContacts.forEach(id => { body.individualAmounts[id] = parseFloat(manualAmounts[id] || '0'); });
+        body.userAmount = parseFloat(userAmount) || 0;
       }
-
       const response = await fetch(`${config.BASE_URL}/group-transactions`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
       });
-
       const data = await response.json();
-
       if (data.success) {
-        showSuccess(`Group transaction created successfully! Per person: Rs ${data.data.perPersonShare}`);
-        router.back();
-      } else {
-        showError(data.message || 'Failed to create group transaction');
-      }
+        showSuccess(`Group transaction created! Per person: Rs ${data.data.perPersonShare}`);
+        goBack();
+      } else showError(data.message || 'Failed to create');
     } catch (error) {
-      console.error('Error creating group transaction:', error);
+      console.error('Error:', error);
       showError('Failed to create group transaction');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
-  const renderContactItem = ({ item }: { item: Contact }) => {
-    const contactId = item._id || item.id || '';
-    const isSelected = selectedContacts.includes(contactId);
-
+  const renderContact = ({ item }: { item: Contact }) => {
+    const id = item._id || item.id || '';
+    const selected = selectedContacts.includes(id);
     return (
-      <View style={[
-        styles.contactCard,
-        isSelected && styles.selectedContactCard,
-      ]}>
-        <TouchableOpacity
-          style={styles.contactInfo}
-          onPress={() => toggleContactSelection(contactId)}
-        >
-          <Text style={[styles.contactName, isSelected && styles.selectedText]}>
-            {item.name}
-          </Text>
-          <Text style={[styles.contactPhone, isSelected && styles.selectedText]}>
-            {item.phone}
-          </Text>
-        </TouchableOpacity>
-        
-        <View style={styles.contactActions}>
-          {isSelected && (
-            <>
-              <View style={styles.selectedIndicator}>
-                <Text style={styles.selectedIndicatorText}>✓</Text>
-              </View>
-              
-              {/* Manual Amount Input */}
-              {splitMode === 'manual' && (
-                <View style={styles.manualAmountContainer}>
-                  <Text style={styles.manualAmountLabel}>Amount (Rs)</Text>
-                  <TextInput
-                    style={styles.manualAmountInput}
-                    value={manualAmounts[contactId] || ''}
-                    onChangeText={(amount) => updateManualAmount(contactId, amount)}
-                    placeholder="0.00"
-                    placeholderTextColor={placeholderColor}
-                    keyboardType="numeric"
-                  />
-                </View>
-              )}
-            </>
+      <TouchableOpacity
+        style={[styles.contactCard, {
+          backgroundColor: selected
+            ? (isDarkMode ? 'rgba(34, 211, 238, 0.08)' : 'rgba(10, 126, 164, 0.06)')
+            : (isDarkMode ? 'rgba(30, 41, 59, 0.5)' : '#ffffff'),
+          borderColor: selected ? accent : borderColor,
+        }]}
+        onPress={() => toggleContact(id)}
+        activeOpacity={0.7}
+      >
+        <View style={[styles.contactAvatar, {
+          backgroundColor: selected
+            ? (isDarkMode ? 'rgba(34, 211, 238, 0.15)' : 'rgba(10, 126, 164, 0.1)')
+            : (isDarkMode ? 'rgba(255,255,255,0.05)' : '#f1f5f9'),
+          overflow: 'hidden',
+        }]}>
+          {item.profilePicture ? (
+            <Image source={{ uri: item.profilePicture }} style={{ width: 40, height: 40, borderRadius: 20 }} contentFit="cover" />
+          ) : (
+            <Text style={[styles.contactAvatarText, { color: selected ? accent : COLORS.textMuted }]}>
+              {item.name.charAt(0).toUpperCase()}
+            </Text>
           )}
         </View>
-      </View>
+        <View style={styles.contactInfo}>
+          <Text style={[styles.contactName, { color: selected ? accent : COLORS.text }]} numberOfLines={1}>{item.name}</Text>
+          <Text style={[styles.contactPhone, { color: COLORS.textMuted }]}>{item.phone}</Text>
+        </View>
+        {selected && (
+          <View style={[styles.checkCircle, { backgroundColor: accent }]}>
+            <Ionicons name="checkmark" size={14} color="#fff" />
+          </View>
+        )}
+        {!selected && (
+          <View style={[styles.uncheckCircle, { borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : '#d1d5db' }]} />
+        )}
+      </TouchableOpacity>
     );
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Text style={styles.backButtonText}>← Back</Text>
+    <View style={[styles.container, { backgroundColor: COLORS.background }]}>
+      <StatusBar barStyle="light-content" />
+
+      {/* Header */}
+      <View style={[styles.header, {
+        backgroundColor: isDarkMode ? '#1c1e1f' : accent,
+        borderBottomWidth: isDarkMode ? 1 : 0,
+        borderColor: 'rgba(34, 211, 238, 0.2)',
+      }]}>
+        <TouchableOpacity onPress={() => goBack()} hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
+          <Ionicons name="chevron-back" size={28} color="#ffffff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Create Group Transaction</Text>
-        <View style={styles.placeholder} />
+        <Text style={styles.headerTitle}>New Group Transaction</Text>
+        <View style={{ width: 28 }} />
       </View>
 
-      <View style={styles.content}>
-        {/* Transaction Details */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Transaction Details</Text>
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Total Amount (Rs)</Text>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+
+        {/* Amount */}
+        <View style={[styles.amountCard, { backgroundColor: cardBg, borderColor }]}>
+          <Text style={[styles.sectionLabel, { color: COLORS.textMuted }]}>TOTAL AMOUNT</Text>
+          <View style={styles.amountRow}>
+            <Text style={[styles.currencyBig, { color: accent }]}>Rs</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.amountInputBig, { color: COLORS.text }]}
+              placeholder="0"
+              placeholderTextColor={COLORS.textMuted}
               value={totalAmount}
               onChangeText={setTotalAmount}
-              placeholder="Enter total amount"
-              placeholderTextColor={placeholderColor}
               keyboardType="numeric"
             />
           </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Description</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              value={description}
-              onChangeText={setDescription}
-              placeholder="Enter description"
-              placeholderTextColor={placeholderColor}
-              multiline
-              numberOfLines={3}
-            />
-          </View>
         </View>
 
-        {/* Split Mode Selection */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>How to Split?</Text>
-          
-          <View style={styles.splitModeContainer}>
-            <TouchableOpacity
-              style={[
-                styles.splitModeButton,
-                splitMode === 'equal' && styles.splitModeButtonSelected,
-              ]}
-              onPress={() => setSplitMode('equal')}
-            >
-              <Text style={[
-                styles.splitModeText,
-                splitMode === 'equal' && styles.splitModeTextSelected,
-              ]}>
-                ⚖️ Equal Divide
-              </Text>
-              <Text style={[
-                styles.splitModeSubtext,
-                splitMode === 'equal' && styles.splitModeSubtextSelected,
-              ]}>
-                Split equally among all
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[
-                styles.splitModeButton,
-                splitMode === 'manual' && styles.splitModeButtonSelected,
-              ]}
-              onPress={() => setSplitMode('manual')}
-            >
-              <Text style={[
-                styles.splitModeText,
-                splitMode === 'manual' && styles.splitModeTextSelected,
-              ]}>
-                ✏️ Manual Entry
-              </Text>
-              <Text style={[
-                styles.splitModeSubtext,
-                splitMode === 'manual' && styles.splitModeSubtextSelected,
-              ]}>
-                Enter custom amounts
-              </Text>
-            </TouchableOpacity>
-          </View>
+        {/* Description */}
+        <View style={[styles.fieldRow, { backgroundColor: cardBg, borderColor }]}>
+          <Ionicons name="document-text-outline" size={20} color={COLORS.textMuted} />
+          <TextInput
+            style={[styles.fieldInput, { color: COLORS.text }]}
+            placeholder="What's this for?"
+            placeholderTextColor={COLORS.textMuted}
+            value={description}
+            onChangeText={setDescription}
+          />
         </View>
 
-        {/* User Amount Input (Manual Mode Only) */}
+        {/* Split Mode */}
+        <Text style={[styles.sectionTitle, { color: COLORS.text }]}>How to Split?</Text>
+        <View style={styles.splitRow}>
+          <TouchableOpacity
+            style={[styles.splitBtn, {
+              backgroundColor: splitMode === 'equal' ? (isDarkMode ? 'rgba(34, 211, 238, 0.1)' : 'rgba(10, 126, 164, 0.08)') : (isDarkMode ? 'transparent' : '#f8fafc'),
+              borderColor: splitMode === 'equal' ? accent : borderColor,
+            }]}
+            onPress={() => setSplitMode('equal')}
+          >
+            <Ionicons name="git-compare-outline" size={22} color={splitMode === 'equal' ? accent : COLORS.textMuted} />
+            <Text style={[styles.splitBtnTitle, { color: splitMode === 'equal' ? accent : COLORS.text }]}>Equal</Text>
+            <Text style={[styles.splitBtnSub, { color: COLORS.textMuted }]}>Split equally</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.splitBtn, {
+              backgroundColor: splitMode === 'manual' ? (isDarkMode ? 'rgba(34, 211, 238, 0.1)' : 'rgba(10, 126, 164, 0.08)') : (isDarkMode ? 'transparent' : '#f8fafc'),
+              borderColor: splitMode === 'manual' ? accent : borderColor,
+            }]}
+            onPress={() => setSplitMode('manual')}
+          >
+            <Ionicons name="create-outline" size={22} color={splitMode === 'manual' ? accent : COLORS.textMuted} />
+            <Text style={[styles.splitBtnTitle, { color: splitMode === 'manual' ? accent : COLORS.text }]}>Manual</Text>
+            <Text style={[styles.splitBtnSub, { color: COLORS.textMuted }]}>Custom amounts</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Your Amount (manual) */}
         {splitMode === 'manual' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Your Amount</Text>
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Your Share (Rs)</Text>
-              <TextInput
-                style={styles.input}
-                value={userAmount}
-                onChangeText={setUserAmount}
-                placeholder="Enter your amount"
-                placeholderTextColor={placeholderColor}
-                keyboardType="numeric"
-              />
-            </View>
+          <View style={[styles.fieldRow, { backgroundColor: cardBg, borderColor }]}>
+            <Ionicons name="person-outline" size={20} color={COLORS.textMuted} />
+            <TextInput
+              style={[styles.fieldInput, { color: COLORS.text }]}
+              placeholder="Your share (Rs)"
+              placeholderTextColor={COLORS.textMuted}
+              value={userAmount}
+              onChangeText={setUserAmount}
+              keyboardType="numeric"
+            />
           </View>
         )}
 
-        {/* Contact Selection */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            Select Contacts ({selectedContacts.length} selected)
-          </Text>
-          
-          {contacts.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No contacts available</Text>
-              <TouchableOpacity
-                style={styles.addContactButton}
-                onPress={() => router.push('/contacts/add')}
-              >
-                <Text style={styles.addContactButtonText}>Add Contact</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <FlatList
-              data={contacts}
-              keyExtractor={(item) => item._id || item.id || ''}
-              renderItem={renderContactItem}
-              scrollEnabled={false}
-              showsVerticalScrollIndicator={false}
-            />
-          )}
-        </View>
+        {/* Contacts */}
+        <Text style={[styles.sectionTitle, { color: COLORS.text }]}>
+          Select Contacts ({selectedContacts.length})
+        </Text>
+
+        {contacts.length === 0 ? (
+          <View style={styles.noContacts}>
+            <Text style={[styles.noContactsText, { color: COLORS.textMuted }]}>No contacts available</Text>
+            <TouchableOpacity style={[styles.addContactBtn, { backgroundColor: accent }]} onPress={() => router.push('/contacts/add')}>
+              <Text style={styles.addContactBtnText}>Add Contact</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          contacts.map((item) => {
+            const id = item._id || item.id || '';
+            const selected = selectedContacts.includes(id);
+            return (
+              <View key={id}>
+                {renderContact({ item })}
+                {selected && splitMode === 'manual' && (
+                  <View style={[styles.manualAmountRow, { borderColor }]}>
+                    <Text style={[styles.manualLabel, { color: COLORS.textMuted }]}>Amount:</Text>
+                    <TextInput
+                      style={[styles.manualInput, { backgroundColor: inputBg, borderColor, color: COLORS.text }]}
+                      value={manualAmounts[id] || ''}
+                      onChangeText={(v) => updateManualAmount(id, v)}
+                      placeholder="0"
+                      placeholderTextColor={COLORS.textMuted}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                )}
+              </View>
+            );
+          })
+        )}
 
         {/* Summary */}
-        {selectedContacts.length > 0 && totalAmount && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Summary</Text>
-            <View style={styles.summaryCard}>
+        {selectedContacts.length > 0 && totalAmount ? (
+          <View style={[styles.summaryCard, { backgroundColor: cardBg, borderColor }]}>
+            <Text style={[styles.summaryTitle, { color: COLORS.text }]}>Summary</Text>
+            <View style={styles.summaryRow}>
+              <Text style={[styles.summaryLabel, { color: COLORS.textMuted }]}>Total Amount</Text>
+              <Text style={[styles.summaryValue, { color: COLORS.text }]}>Rs {totalAmount}</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={[styles.summaryLabel, { color: COLORS.textMuted }]}>Members (incl. You)</Text>
+              <Text style={[styles.summaryValue, { color: COLORS.text }]}>{selectedContacts.length + 1}</Text>
+            </View>
+            {splitMode === 'equal' ? (
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Total Amount:</Text>
-                <Text style={styles.summaryValue}>Rs {totalAmount}</Text>
+                <Text style={[styles.summaryLabel, { color: COLORS.textMuted }]}>Per Person</Text>
+                <Text style={[styles.summaryValue, { color: accent }]}>Rs {perPersonShare()}</Text>
               </View>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Members (incl. You):</Text>
-                <Text style={styles.summaryValue}>{selectedContacts.length + 1}</Text>
-              </View>
-              
-              {splitMode === 'equal' ? (
+            ) : (
+              <>
                 <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Per Person Share:</Text>
-                  <Text style={styles.summaryValue}>Rs {calculatePerPersonShare()}</Text>
+                  <Text style={[styles.summaryLabel, { color: COLORS.textMuted }]}>Manual Total</Text>
+                  <Text style={[styles.summaryValue, { color: isManualValid() ? COLORS.text : '#ef4444' }]}>
+                    Rs {getTotalManualAmount().toFixed(2)}
+                  </Text>
                 </View>
-              ) : (
-                <>
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Your Amount:</Text>
-                    <Text style={styles.summaryValue}>Rs {parseFloat(userAmount || '0').toFixed(2)}</Text>
-                  </View>
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Contacts Total:</Text>
-                    <Text style={styles.summaryValue}>Rs {Object.values(manualAmounts).reduce((sum, amount) => sum + (parseFloat(amount) || 0), 0).toFixed(2)}</Text>
-                  </View>
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Manual Total:</Text>
-                    <Text style={[
-                      styles.summaryValue,
-                      !isManualAmountValid() && styles.errorText
-                    ]}>
-                      Rs {getTotalManualAmount().toFixed(2)}
-                    </Text>
-                  </View>
-                  {!isManualAmountValid() && (
-                    <Text style={styles.errorMessage}>
-                      Manual amounts must equal total amount
-                    </Text>
-                  )}
-                </>
-              )}
-              
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Payer:</Text>
-                <Text style={styles.summaryValue}>You</Text>
-              </View>
+                {!isManualValid() && (
+                  <Text style={styles.errorMsg}>Amounts must equal total</Text>
+                )}
+              </>
+            )}
+            <View style={styles.summaryRow}>
+              <Text style={[styles.summaryLabel, { color: COLORS.textMuted }]}>Payer</Text>
+              <Text style={[styles.summaryValue, { color: COLORS.text }]}>You</Text>
             </View>
           </View>
-        )}
+        ) : null}
 
-        {/* Submit Button */}
+        {/* Submit */}
         <TouchableOpacity
-          style={[
-            styles.submitButton,
-            (selectedContacts.length < 1 || !totalAmount || !description.trim() || 
-             (splitMode === 'manual' && !isManualAmountValid())) && styles.disabledButton,
-          ]}
+          style={[styles.submitBtn, { backgroundColor: accent }, !canSubmit && { opacity: 0.5 }]}
           onPress={handleSubmit}
-          disabled={loading || selectedContacts.length < 1 || !totalAmount || !description.trim() || 
-                   (splitMode === 'manual' && !isManualAmountValid())}
+          disabled={loading || !canSubmit}
         >
-          <Text style={styles.submitButtonText}>
-            {loading ? 'Creating...' : 'Create Group Transaction'}
-          </Text>
+          {loading ? <ActivityIndicator color="#fff" /> : (
+            <>
+              <Text style={styles.submitBtnText}>Create Group Transaction</Text>
+              <Ionicons name="checkmark-circle" size={20} color="#fff" style={{ marginLeft: 8 }} />
+            </>
+          )}
         </TouchableOpacity>
-      </View>
-    </ScrollView>
+
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
+  container: { flex: 1 },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-    backgroundColor: '#9b59b6',
+    paddingTop: 60, paddingBottom: 16, paddingHorizontal: 20,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 5,
   },
-  backButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+  headerTitle: { color: '#ffffff', fontSize: 18, fontWeight: '700' },
+  body: { padding: 20 },
+
+  amountCard: {
+    borderRadius: 18, borderWidth: 1, padding: 20, alignItems: 'center', marginBottom: 14,
   },
-  backButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
+  sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 1, marginBottom: 10 },
+  amountRow: { flexDirection: 'row', alignItems: 'center' },
+  currencyBig: { fontSize: 24, fontWeight: '800', marginRight: 8 },
+  amountInputBig: { fontSize: 48, fontWeight: '900', minWidth: 80, textAlign: 'center' },
+
+  fieldRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 16, paddingVertical: 14, borderRadius: 14, borderWidth: 1, marginBottom: 14,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: 'white',
+  fieldInput: { flex: 1, fontSize: 15, fontWeight: '600' },
+
+  sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12, marginTop: 8 },
+
+  splitRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
+  splitBtn: {
+    flex: 1, alignItems: 'center', paddingVertical: 16, borderRadius: 14, borderWidth: 1.5, gap: 4,
   },
-  placeholder: {
-    width: 60,
-  },
-  content: {
-    padding: 20,
-  },
-  section: {
-    marginBottom: 30,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#2c3e50',
-    marginBottom: 15,
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#2c3e50',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#e1e8ed',
-  },
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
+  splitBtnTitle: { fontSize: 14, fontWeight: '700' },
+  splitBtnSub: { fontSize: 11, fontWeight: '500' },
+
   contactCard: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e1e8ed',
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12,
+    borderRadius: 14, borderWidth: 1, marginBottom: 8,
   },
-  selectedContactCard: {
-    borderColor: '#9b59b6',
-    backgroundColor: '#f8f5ff',
+  contactAvatar: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  contactAvatarText: { fontSize: 16, fontWeight: '800' },
+  contactInfo: { flex: 1 },
+  contactName: { fontSize: 15, fontWeight: '700', marginBottom: 1 },
+  contactPhone: { fontSize: 12 },
+  checkCircle: { width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  uncheckCircle: { width: 24, height: 24, borderRadius: 12, borderWidth: 2 },
+
+  manualAmountRow: {
+    flexDirection: 'row', alignItems: 'center', paddingLeft: 66, paddingRight: 14,
+    marginTop: -4, marginBottom: 8,
   },
-  contactInfo: {
-    flex: 1,
+  manualLabel: { fontSize: 12, fontWeight: '600', marginRight: 8 },
+  manualInput: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, fontSize: 14, width: 90, textAlign: 'center' },
+
+  noContacts: { alignItems: 'center', paddingVertical: 30 },
+  noContactsText: { fontSize: 15, marginBottom: 12 },
+  addContactBtn: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: 12 },
+  addContactBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+
+  summaryCard: { borderRadius: 16, borderWidth: 1, padding: 18, marginTop: 16, marginBottom: 8 },
+  summaryTitle: { fontSize: 16, fontWeight: '700', marginBottom: 14 },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  summaryLabel: { fontSize: 14 },
+  summaryValue: { fontSize: 14, fontWeight: '700' },
+  errorMsg: { fontSize: 12, color: '#ef4444', textAlign: 'center', marginTop: -4, marginBottom: 8 },
+
+  submitBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 18, borderRadius: 18, marginTop: 16,
+    shadowColor: '#0a7ea4', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 8,
   },
-  contactName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#2c3e50',
-    marginBottom: 4,
-  },
-  contactPhone: {
-    fontSize: 14,
-    color: '#7f8c8d',
-  },
-  selectedText: {
-    color: '#9b59b6',
-  },
-  contactActions: {
-    marginLeft: 10,
-  },
-  selectedIndicator: {
-    backgroundColor: '#27ae60',
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  selectedIndicatorText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  emptyStateText: {
-    fontSize: 16,
-    color: '#7f8c8d',
-    marginBottom: 15,
-  },
-  addContactButton: {
-    backgroundColor: '#9b59b6',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-  },
-  addContactButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  summaryCard: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 15,
-    borderWidth: 1,
-    borderColor: '#e1e8ed',
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  summaryLabel: {
-    fontSize: 14,
-    color: '#7f8c8d',
-  },
-  summaryValue: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#2c3e50',
-  },
-  submitButton: {
-    backgroundColor: '#9b59b6',
-    borderRadius: 8,
-    paddingVertical: 15,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  disabledButton: {
-    backgroundColor: '#bdc3c7',
-  },
-  submitButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  // Split Mode Styles
-  splitModeContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 15,
-  },
-  splitModeButton: {
-    flex: 1,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 15,
-    marginHorizontal: 5,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#e1e8ed',
-  },
-  splitModeButtonSelected: {
-    borderColor: '#9b59b6',
-    backgroundColor: '#f8f5ff',
-  },
-  splitModeText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2c3e50',
-    marginBottom: 5,
-  },
-  splitModeTextSelected: {
-    color: '#9b59b6',
-  },
-  splitModeSubtext: {
-    fontSize: 12,
-    color: '#7f8c8d',
-    textAlign: 'center',
-  },
-  splitModeSubtextSelected: {
-    color: '#9b59b6',
-  },
-  // Manual Amount Styles
-  manualAmountContainer: {
-    marginTop: 10,
-    alignItems: 'center',
-  },
-  manualAmountLabel: {
-    fontSize: 12,
-    color: '#7f8c8d',
-    marginBottom: 5,
-  },
-  manualAmountInput: {
-    backgroundColor: 'white',
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    fontSize: 14,
-    borderWidth: 1,
-    borderColor: '#e1e8ed',
-    width: 80,
-    textAlign: 'center',
-  },
-  // Error Styles
-  errorText: {
-    color: '#e74c3c',
-  },
-  errorMessage: {
-    fontSize: 12,
-    color: '#e74c3c',
-    textAlign: 'center',
-    marginTop: 5,
-  },
+  submitBtnText: { color: '#fff', fontSize: 17, fontWeight: '800' },
 });

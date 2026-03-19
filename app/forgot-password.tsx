@@ -4,6 +4,7 @@ import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { showError, showSuccess } from '@/utils/toast';
 import { router } from 'expo-router';
+import { goBack } from '@/utils/navigation';
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   KeyboardAvoidingView, 
@@ -181,7 +182,7 @@ export default function ForgotPasswordScreen() {
 
               <TouchableOpacity 
                 style={styles.backButton}
-                onPress={() => router.back()}
+                onPress={() => goBack()}
               >
                 <View style={styles.backButtonContent}>
                   <Ionicons name="arrow-back" size={18} color={isDarkMode ? '#94a3b8' : '#64748b'} />

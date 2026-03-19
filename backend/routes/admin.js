@@ -6,6 +6,7 @@ const Transaction = require('../models/Transaction');
 const GroupTransaction = require('../models/GroupTransaction');
 const MessRecord = require('../models/MessRecord');
 const PersonalTransaction = require('../models/PersonalTransaction');
+const Notification = require('../models/Notification');
 const { sendAppUpdateEmail } = require('../services/emailService');
 
 const router = express.Router();
@@ -131,6 +132,17 @@ router.post('/app-update/broadcast', authenticateToken, requireAdmin, async (req
           error: r.reason?.message || r.value?.error || 'Unknown error',
         });
       }
+    });
+
+    // Save ONE broadcast admin-alert notification (visible to all users)
+    await Notification.create({
+      type: 'admin-alert',
+      isBroadcast: true,
+      title: subject || 'Khaata App Update',
+      message: `Version ${version}: ${message}${updateUrl ? '\n\n' + updateUrl : ''}`,
+      status: 'sent',
+      sentAt: new Date(),
+      readBy: [],
     });
 
     return res.json({

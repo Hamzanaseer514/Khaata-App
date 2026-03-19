@@ -1,6 +1,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/DarkModeContext';
 import config from '@/config/config';
+import { goBack } from '@/utils/navigation';
 import { router } from 'expo-router';
 import React, { useEffect, useState, useRef } from 'react';
 import {
@@ -113,7 +114,7 @@ export default function RewardsScreen() {
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity onPress={() => goBack()} style={styles.backButton}>
             <Ionicons name="chevron-back" size={24} color={COLORS.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Khaata Coins</Text>

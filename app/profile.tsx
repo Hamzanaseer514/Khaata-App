@@ -1,6 +1,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/DarkModeContext';
 import config from '@/config/config';
+import { goBack } from '@/utils/navigation';
 import { router } from 'expo-router';
 import React, { useEffect, useRef } from 'react';
 import {
@@ -28,6 +29,7 @@ export default function ProfileScreen() {
   const styles = createStyles(COLORS, isDarkMode);
 
   const [summary, setSummary] = React.useState<{ points: number; level: string } | null>(null);
+  const [showLogoutConfirm, setShowLogoutConfirm] = React.useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
@@ -69,23 +71,8 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to exit your session?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Logout', 
-          style: 'destructive', 
-          onPress: async () => {
-            await logout();
-            router.replace('/login');
-          } 
-        }
-      ]
-    );
-  };
+  const handleLogout = () => { setShowLogoutConfirm(true); };
+  const confirmLogout = async () => { setShowLogoutConfirm(false); await logout(); router.replace('/login'); };
 
   const memberSince = user?.createdAt 
     ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
@@ -107,7 +94,7 @@ export default function ProfileScreen() {
         <View style={styles.header}>
           <TouchableOpacity 
             style={styles.backButton} 
-            onPress={() => router.back()}
+            onPress={() => goBack()}
             activeOpacity={0.7}
           >
             <View style={styles.backButtonInner}>
@@ -229,6 +216,27 @@ export default function ProfileScreen() {
         </View>
       </ScrollView>
 
+      {/* Logout Confirm */}
+      {showLogoutConfirm && (
+        <View style={styles.logoutOverlay}>
+          <View style={[styles.logoutModal, { backgroundColor: isDarkMode ? '#1e293b' : '#ffffff' }]}>
+            <Ionicons name="log-out-outline" size={44} color={isDarkMode ? '#22d3ee' : '#0a7ea4'} style={{ alignSelf: 'center', marginBottom: 12 }} />
+            <Text style={[styles.logoutTitle, { color: COLORS.text }]}>Logout?</Text>
+            <Text style={[styles.logoutDesc, { color: COLORS.textMuted }]}>Are you sure you want to end your session?</Text>
+            <View style={styles.logoutActions}>
+              <TouchableOpacity
+                style={[styles.logoutCancelBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : '#f3f4f6' }]}
+                onPress={() => setShowLogoutConfirm(false)}
+              >
+                <Text style={[styles.logoutCancelText, { color: COLORS.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.logoutConfirmBtn} onPress={confirmLogout}>
+                <Text style={styles.logoutConfirmText}>Yes, Logout</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
       <BottomNav />
     </View>
   );
@@ -448,5 +456,17 @@ const createStyles = (COLORS: any, isDarkMode: boolean) => StyleSheet.create({
     color: COLORS.textMuted,
     marginTop: 4,
     opacity: 0.7,
-  }
+  },
+  logoutOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', zIndex: 100, padding: 20,
+  },
+  logoutModal: { borderRadius: 18, padding: 24, width: '100%', maxWidth: 380 },
+  logoutTitle: { fontSize: 18, fontWeight: '700', textAlign: 'center', marginBottom: 8 },
+  logoutDesc: { fontSize: 14, textAlign: 'center', marginBottom: 20, lineHeight: 20 },
+  logoutActions: { flexDirection: 'row', gap: 10 },
+  logoutCancelBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
+  logoutCancelText: { fontSize: 15, fontWeight: '600' },
+  logoutConfirmBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center', backgroundColor: '#ef4444' },
+  logoutConfirmText: { fontSize: 15, fontWeight: '600', color: '#ffffff' },
 });

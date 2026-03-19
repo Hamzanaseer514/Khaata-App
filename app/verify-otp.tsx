@@ -4,6 +4,7 @@ import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { showError, showSuccess } from '@/utils/toast';
 import { router, useLocalSearchParams } from 'expo-router';
+import { goBack } from '@/utils/navigation';
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   KeyboardAvoidingView, 
@@ -187,7 +188,7 @@ export default function VerifyOtpScreen() {
 
             <TouchableOpacity 
               style={styles.backButton}
-              onPress={() => router.back()}
+              onPress={() => goBack()}
             >
               <Text style={[styles.backButtonText, { color: isDarkMode ? '#64748b' : '#94a3b8' }]}>
                 Back to Sign Up

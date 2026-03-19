@@ -77,27 +77,36 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-// GET /api/notifications/alerts - admin alerts (in-app)
+// GET /api/notifications/alerts - admin alerts (in-app) - fetches broadcast alerts
 router.get('/alerts', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const alerts = await Notification.find({ userId, type: 'admin-alert' })
+    const alerts = await Notification.find({ type: 'admin-alert', isBroadcast: true })
       .sort({ createdAt: -1 })
       .limit(20)
       .lean();
-    const unreadCount = alerts.filter(a => !a.isRead).length;
-    return res.json({ success: true, data: { alerts, unreadCount } });
+
+    // Map read status per-user from readBy array
+    const mapped = alerts.map(a => ({
+      ...a,
+      isRead: (a.readBy || []).some(id => id.toString() === userId),
+    }));
+    const unreadCount = mapped.filter(a => !a.isRead).length;
+    return res.json({ success: true, data: { alerts: mapped, unreadCount } });
   } catch (error) {
     console.error('Error fetching alerts:', error);
     return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
 
-// PATCH /api/notifications/alerts/read - mark all admin alerts as read
+// PATCH /api/notifications/alerts/read - mark all broadcast alerts as read for this user
 router.patch('/alerts/read', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
-    await Notification.updateMany({ userId, type: 'admin-alert', isRead: false }, { $set: { isRead: true } });
+    await Notification.updateMany(
+      { type: 'admin-alert', isBroadcast: true, readBy: { $ne: userId } },
+      { $addToSet: { readBy: userId } }
+    );
     return res.json({ success: true, message: 'Alerts marked as read' });
   } catch (error) {
     console.error('Error marking alerts read:', error);
@@ -105,14 +114,14 @@ router.patch('/alerts/read', authenticateToken, async (req, res) => {
   }
 });
 
-// PATCH /api/notifications/alerts/:id/read - mark single admin alert as read
+// PATCH /api/notifications/alerts/:id/read - mark single broadcast alert as read for this user
 router.patch('/alerts/:id/read', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     const alertId = req.params.id;
     const updated = await Notification.findOneAndUpdate(
-      { _id: alertId, userId, type: 'admin-alert' },
-      { $set: { isRead: true } },
+      { _id: alertId, type: 'admin-alert', isBroadcast: true },
+      { $addToSet: { readBy: userId } },
       { new: true }
     );
     if (!updated) {

@@ -23,20 +23,32 @@ export default function DashboardScreen() {
   const [payablesAmount, setPayablesAmount] = React.useState(0); // you owe friends
   const [contactsOwingCount, setContactsOwingCount] = React.useState(0);
   const [contactsYouOweCount, setContactsYouOweCount] = React.useState(0);
-  const [topOwing, setTopOwing] = React.useState<{ name: string; amount: number }[]>([]);
+  const [topOwing, setTopOwing] = React.useState<{ name: string; amount: number; profilePicture?: string | null }[]>([]);
   const [monthlyBars, setMonthlyBars] = React.useState<{ label: string; userPaid: number; friendPaid: number; net: number; userCount: number; friendCount: number }[]>([]);
   const [balanceBuckets, setBalanceBuckets] = React.useState<{ label: string; count: number }[]>([]);
   const [rewardSummary, setRewardSummary] = React.useState<{ points: number; level: string } | null>(null);
+  const [unreadAlerts, setUnreadAlerts] = React.useState(0);
+
+  const loadAlertCount = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${config.BASE_URL}/notifications/alerts`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (data.success) setUnreadAlerts(data.data.unreadCount || 0);
+    } catch (e) { /* silent */ }
+  };
 
   React.useEffect(() => {
     loadContactsAnalytics();
     loadRewardSummary();
+    loadAlertCount();
   }, [token]);
 
   useFocusEffect(
     React.useCallback(() => {
       loadContactsAnalytics();
       loadRewardSummary();
+      loadAlertCount();
       return () => {};
     }, [])
   );
@@ -65,21 +77,21 @@ export default function DashboardScreen() {
       });
       const data = await res.json();
       if (data?.success && Array.isArray(data.data)) {
-        const contacts = data.data as { name: string; balance: number }[];
+        const contacts = data.data as { name: string; balance: number; profilePicture?: string | null }[];
         setTotalContacts(contacts.length);
 
         let recv = 0; 
         let pay = 0;  
         let recvCount = 0;
         let payCount = 0;
-        const owingList: { name: string; amount: number }[] = [];
+        const owingList: { name: string; amount: number; profilePicture?: string | null }[] = [];
 
         contacts.forEach((c) => {
           const bal = Number(c.balance || 0);
           if (bal > 0) {
             recv += bal;
             recvCount += 1;
-            owingList.push({ name: c.name, amount: bal });
+            owingList.push({ name: c.name, amount: bal, profilePicture: c.profilePicture });
           } else if (bal < 0) {
             pay += Math.abs(bal);
             payCount += 1;
@@ -134,7 +146,7 @@ export default function DashboardScreen() {
       id: 'contacts',
       title: 'Contacts',
       description: 'Manage debt',
-      icon: '👥',
+      icon: 'people-outline' as const,
       color: COLORS.primary,
       onPress: () => router.push('/contacts')
     },
@@ -142,7 +154,7 @@ export default function DashboardScreen() {
       id: 'personal-khaata',
       title: 'Personal',
       description: 'Expenses',
-      icon: '📝',
+      icon: 'wallet-outline' as const,
       color: COLORS.success,
       onPress: () => router.push('/personal-khaata')
     },
@@ -150,7 +162,7 @@ export default function DashboardScreen() {
       id: 'group-khaata',
       title: 'Group',
       description: 'Split bills',
-      icon: '👨‍👩‍👧‍👦',
+      icon: 'git-network-outline' as const,
       color: COLORS.secondary,
       onPress: () => router.push('/group-khaata')
     },
@@ -158,50 +170,26 @@ export default function DashboardScreen() {
       id: 'mess',
       title: 'Mess',
       description: 'Daily meals',
-      icon: '🍽️',
+      icon: 'restaurant-outline' as const,
       color: COLORS.warning,
       onPress: () => router.push('/mess')
-    },
-    {
-      id: 'mess analytics',
-      title: 'Mess Analytics',
-      description: 'View detailed analytics',
-      icon: '📊',
-      color: '#f39c12',
-      onPress: () => router.push('/mess-analytics')
     },
     {
       id: 'notifications',
       title: 'Alerts',
       description: 'Stay updated',
-      icon: '📧',
+      icon: 'notifications-outline' as const,
       color: COLORS.info,
       onPress: () => router.push('/notifications')
     },
-    // {
-    //   id: 'transactions',
-    //   title: 'Transactions',
-    //   description: 'View transaction history',
-    //   icon: '💰',
-    //   color: '#27ae60',
-    //   onPress: () => Alert.alert('Coming Soon', 'Transactions module will be available soon!')
-    // },
     {
       id: 'reports',
       title: 'Reports',
       description: 'Export data',
-      icon: '📊',
+      icon: 'document-text-outline' as const,
       color: COLORS.danger,
       onPress: () => router.push('/reports')
     },
-    {
-      id: 'settings',
-      title: 'Settings',
-      description: 'App settings',
-      icon: '⚙️',
-      color: '#95a5a6',
-      onPress: () => router.push('/settings')
-    }
   ];
 
   return (
@@ -248,14 +236,18 @@ export default function DashboardScreen() {
             <Text style={styles.userName}>{user?.name} ✨</Text>
           </View>
 
-          <TouchableOpacity 
-            style={styles.headerIconButton} 
-            onPress={handleLogout}
+          <TouchableOpacity
+            style={styles.headerIconButton}
+            onPress={() => router.push('/admin-alerts')}
             activeOpacity={0.7}
           >
             <View style={styles.iconCircle}>
               <Ionicons name="notifications-outline" size={24} color={COLORS.primary} />
-              <View style={styles.notificationDot} />
+              {unreadAlerts > 0 && (
+                <View style={styles.notificationDot}>
+                  <Text style={styles.notificationDotText}>{unreadAlerts > 9 ? '9+' : unreadAlerts}</Text>
+                </View>
+              )}
             </View>
           </TouchableOpacity>
         </View>
@@ -289,7 +281,7 @@ export default function DashboardScreen() {
                 onPress={module.onPress}
               >
                 <View style={[styles.moduleIcon, { backgroundColor: module.color + '22' }]}>
-                  <Text style={styles.moduleEmoji}>{module.icon}</Text>
+                  <Ionicons name={module.icon} size={22} color={module.color} />
                 </View>
                 <Text style={styles.moduleTitle}>{module.title}</Text>
                 <Text style={styles.moduleDescription}>{module.description}</Text>
@@ -312,23 +304,17 @@ export default function DashboardScreen() {
                   <TouchableOpacity 
                     key={idx} 
                     style={styles.premiumContactCard}
-                    onPress={() => router.push({ pathname: '/contact-detail', params: { name: item.name } })}
+                    // onPress={() => router.push({ pathname: '/contact-detail', params: { name: item.name } })}
                     activeOpacity={0.8}
                   >
                     <View style={styles.contactCardLeft}>
                       <View style={[
-                        styles.contactAvatarBorder, 
+                        styles.contactAvatarBorder,
                         { borderColor: idx % 2 === 0 ? COLORS.primary : COLORS.secondary + '88' }
                       ]}>
-                        <Image 
-                          source={
-                            idx % 3 === 0 
-                              ? require('../assets/images/avatar.png') 
-                              : idx % 3 === 1 
-                                ? require('../assets/images/avatar_female.png') 
-                                : require('../assets/images/avatar_male_2.png')
-                          } 
-                          style={styles.contactAvatarInner} 
+                        <Image
+                          source={item.profilePicture ? { uri: item.profilePicture } : require('../assets/images/avatar_male_2.png')}
+                          style={styles.contactAvatarInner}
                         />
                       </View>
                       <View style={styles.contactNameContainer}>
@@ -606,14 +592,22 @@ const createStyles = (COLORS: any, isDarkMode: boolean) => StyleSheet.create({
   },
   notificationDot: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.secondary,
-    borderWidth: 1,
+    top: 6,
+    right: 6,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#ef4444',
+    borderWidth: 2,
     borderColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  notificationDotText: {
+    color: '#ffffff',
+    fontSize: 9,
+    fontWeight: '800',
   },
   content: {
     padding: 20,
@@ -706,9 +700,6 @@ const createStyles = (COLORS: any, isDarkMode: boolean) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
-  },
-  moduleEmoji: {
-    fontSize: 20,
   },
   moduleTitle: {
     fontSize: 16,
