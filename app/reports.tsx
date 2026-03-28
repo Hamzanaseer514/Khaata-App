@@ -1,8 +1,10 @@
 import { useAuth } from '@/contexts/AuthContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { useTheme } from '@/contexts/DarkModeContext';
 import BottomNav from '@/components/BottomNav';
 import { showError, showSuccess } from '@/utils/toast';
 import { goBack } from '@/utils/navigation';
+import { useTranslation } from 'react-i18next';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import React, { useEffect, useState } from 'react';
@@ -18,6 +20,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import config from '../config/config';
 
 interface Contact {
@@ -27,11 +30,14 @@ interface Contact {
   phone: string;
   email?: string;
   balance: number;
+  profilePicture?: string | null;
 }
 
 export default function ReportsScreen() {
   const { token } = useAuth();
   const { isDarkMode } = useTheme();
+  const { t } = useTranslation();
+  const { currency: cur } = useCurrency();
   const COLORS = isDarkMode ? config.DARK_COLORS : config.LIGHT_COLORS;
   const accent = isDarkMode ? '#22d3ee' : '#0a7ea4';
 
@@ -100,10 +106,10 @@ export default function ReportsScreen() {
     let msg = '';
     if (contact.balance > 0) {
       // Contact owes you → tell them they need to pay
-      msg = `Assalam o Alaikum ${contact.name},\n\nYeh aapko yaad dilana tha ke aapke mere paas *Rs ${amt}* baqaya hain jo aapne dene hain.\n\nBaraye meherbani jaldi se jaldi clear kar dein.\n\nShukriya! 🙏\n\n— Khaata App`;
+      msg = `Assalam o Alaikum ${contact.name},\n\nYeh aapko yaad dilana tha ke aapke mere paas *${cur.symbol} ${amt}* baqaya hain jo aapne dene hain.\n\nBaraye meherbani jaldi se jaldi clear kar dein.\n\nShukriya! 🙏\n\n— Khaata App`;
     } else if (contact.balance < 0) {
       // You owe contact → confirm you know you need to pay
-      msg = `Assalam o Alaikum ${contact.name},\n\nYeh confirm karna tha ke mere zimme aapke *Rs ${amt}* hain jo maine dene hain.\n\nInsha'Allah jaldi clear kar dunga.\n\nShukriya! 🙏\n\n— Khaata App`;
+      msg = `Assalam o Alaikum ${contact.name},\n\nYeh confirm karna tha ke mere zimme aapke *${cur.symbol} ${amt}* hain jo maine dene hain.\n\nInsha'Allah jaldi clear kar dunga.\n\nShukriya! 🙏\n\n— Khaata App`;
     } else {
       // Settled
       msg = `Assalam o Alaikum ${contact.name},\n\nYeh baat karna thi ke hamara hisab kitab bilkul barabar hai. Koi baqaya nahi hai. ✅\n\nShukriya! 🙏\n\n— Khaata App`;
@@ -130,7 +136,11 @@ export default function ReportsScreen() {
         {/* Top row: avatar + info + balance + whatsapp */}
         <View style={styles.cardTop}>
           <View style={[styles.avatar, { backgroundColor: isDarkMode ? 'rgba(34,211,238,0.1)' : 'rgba(10,126,164,0.06)' }]}>
-            <Text style={[styles.avatarText, { color: accent }]}>{item.name.charAt(0).toUpperCase()}</Text>
+            {item.profilePicture ? (
+              <Image source={{ uri: item.profilePicture }} style={{ width: '100%', height: '100%', borderRadius: 20 }} contentFit="cover" />
+            ) : (
+              <Image source={require('../assets/images/avatar_male_2.png')} style={{ width: '100%', height: '100%', borderRadius: 20 }} contentFit="cover" />
+            )}
           </View>
           <View style={styles.cardInfo}>
             <Text style={[styles.cardName, { color: COLORS.text }]} numberOfLines={1}>{item.name}</Text>
@@ -138,7 +148,7 @@ export default function ReportsScreen() {
           </View>
           <View style={styles.cardRight}>
             <Text style={[styles.cardBalance, { color: balColor }]}>
-              Rs {Math.abs(Math.round(item.balance)).toLocaleString()}
+              {cur.symbol} {Math.abs(Math.round(item.balance)).toLocaleString()}
             </Text>
             <Text style={[styles.cardBalanceLabel, { color: balColor }]}>
               {item.balance >= 0 ? "YOU'LL GET" : "YOU'LL GIVE"}
@@ -164,7 +174,7 @@ export default function ReportsScreen() {
             {isExp ? <ActivityIndicator size="small" color="#ef4444" /> : (
               <>
                 <Ionicons name="document-text-outline" size={15} color="#ef4444" />
-                <Text style={[styles.actionBtnText, { color: '#ef4444' }]}>PDF</Text>
+                <Text style={[styles.actionBtnText, { color: '#ef4444' }]}>{t('reports.pdf')}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -177,7 +187,7 @@ export default function ReportsScreen() {
             {isExp ? <ActivityIndicator size="small" color="#10b981" /> : (
               <>
                 <Ionicons name="grid-outline" size={15} color={isDarkMode ? '#34d399' : '#10b981'} />
-                <Text style={[styles.actionBtnText, { color: isDarkMode ? '#34d399' : '#10b981' }]}>CSV</Text>
+                <Text style={[styles.actionBtnText, { color: isDarkMode ? '#34d399' : '#10b981' }]}>{t('reports.csv')}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -207,7 +217,7 @@ export default function ReportsScreen() {
         <TouchableOpacity onPress={() => goBack()} hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
           <Ionicons name="chevron-back" size={28} color="#ffffff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Reports</Text>
+        <Text style={styles.headerTitle}>{t('reports.title')}</Text>
         <View style={{ width: 28 }} />
       </View>
 
@@ -227,9 +237,9 @@ export default function ReportsScreen() {
               }]}>
                 <Ionicons name="arrow-down-circle" size={22} color={isDarkMode ? '#34d399' : '#10b981'} />
                 <Text style={[styles.summaryValue, { color: isDarkMode ? '#34d399' : '#10b981' }]}>
-                  Rs {Math.round(totalReceivable).toLocaleString()}
+                  {cur.symbol} {Math.round(totalReceivable).toLocaleString()}
                 </Text>
-                <Text style={[styles.summaryLabel, { color: COLORS.textMuted }]}>Receivable</Text>
+                <Text style={[styles.summaryLabel, { color: COLORS.textMuted }]}>{t('reports.receivable')}</Text>
               </View>
               <View style={[styles.summaryCard, {
                 backgroundColor: isDarkMode ? 'rgba(239,68,68,0.06)' : '#fef2f2',
@@ -237,9 +247,9 @@ export default function ReportsScreen() {
               }]}>
                 <Ionicons name="arrow-up-circle" size={22} color="#ef4444" />
                 <Text style={[styles.summaryValue, { color: '#ef4444' }]}>
-                  Rs {Math.round(totalPayable).toLocaleString()}
+                  {cur.symbol} {Math.round(totalPayable).toLocaleString()}
                 </Text>
-                <Text style={[styles.summaryLabel, { color: COLORS.textMuted }]}>Payable</Text>
+                <Text style={[styles.summaryLabel, { color: COLORS.textMuted }]}>{t('reports.payable')}</Text>
               </View>
               <View style={[styles.summaryCard, {
                 backgroundColor: isDarkMode ? 'rgba(34,211,238,0.06)' : '#f0f9ff',
@@ -247,7 +257,7 @@ export default function ReportsScreen() {
               }]}>
                 <Ionicons name="people" size={22} color={accent} />
                 <Text style={[styles.summaryValue, { color: accent }]}>{contacts.length}</Text>
-                <Text style={[styles.summaryLabel, { color: COLORS.textMuted }]}>Contacts</Text>
+                <Text style={[styles.summaryLabel, { color: COLORS.textMuted }]}>{t('reports.contacts')}</Text>
               </View>
             </View>
 
@@ -261,8 +271,8 @@ export default function ReportsScreen() {
                   <Ionicons name="download-outline" size={22} color={accent} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.exportAllTitle, { color: COLORS.text }]}>Export All</Text>
-                  <Text style={[styles.exportAllDesc, { color: COLORS.textMuted }]}>Full report of all contacts</Text>
+                  <Text style={[styles.exportAllTitle, { color: COLORS.text }]}>{t('reports.exportAll')}</Text>
+                  <Text style={[styles.exportAllDesc, { color: COLORS.textMuted }]}>{t('reports.fullReport')}</Text>
                 </View>
                 <View style={styles.exportAllBtns}>
                   <TouchableOpacity
@@ -286,7 +296,7 @@ export default function ReportsScreen() {
             </View>
 
             {/* Section label */}
-            <Text style={[styles.sectionLabel, { color: COLORS.textMuted }]}>CONTACTS</Text>
+            <Text style={[styles.sectionLabel, { color: COLORS.textMuted }]}>{t('reports.contacts').toUpperCase()}</Text>
           </>
         }
         ListEmptyComponent={
@@ -294,7 +304,7 @@ export default function ReportsScreen() {
             <View style={[styles.emptyIconWrap, { backgroundColor: isDarkMode ? 'rgba(34,211,238,0.05)' : 'rgba(10,126,164,0.05)' }]}>
               <Ionicons name="people-outline" size={60} color={isDarkMode ? 'rgba(34,211,238,0.2)' : 'rgba(10,126,164,0.2)'} />
             </View>
-            <Text style={[styles.emptyTitle, { color: COLORS.text }]}>No Contacts</Text>
+            <Text style={[styles.emptyTitle, { color: COLORS.text }]}>{t('reports.noContacts')}</Text>
             <Text style={[styles.emptyDesc, { color: COLORS.textMuted }]}>Add contacts to generate reports</Text>
           </View>
         }

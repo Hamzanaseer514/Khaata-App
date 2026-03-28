@@ -2,10 +2,35 @@ import * as SecureStore from 'expo-secure-store';
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import config from '../config/config';
 
+interface VisitingCardData {
+  cardData: {
+    name: string;
+    title: string;
+    phone: string;
+    email: string;
+    address: string;
+    company: string;
+    website: string;
+  };
+  templateId: string;
+  customDesign?: {
+    bgColor: string;
+    accentColor: string;
+    textColor: string;
+    subtextColor: string;
+    layout: string;
+    circleStyle: string;
+    showLogo: boolean;
+  };
+  isCustom: boolean;
+}
+
 interface User {
   id: string;
   name: string;
   email: string;
+  profilePicture?: string | null;
+  visitingCard?: VisitingCardData | null;
   createdAt: string;
   role?: 'user' | 'admin';
 }
@@ -22,6 +47,7 @@ interface AuthContextType {
   changePassword: (currentPassword: string, newPassword: string, confirmNewPassword: string) => Promise<{ success: boolean; message: string }>;
   forgotPassword: (email: string) => Promise<{ success: boolean; message: string }>;
   resetPassword: (email: string, otp: string, newPassword: string) => Promise<{ success: boolean; message: string }>;
+  updateUser: (updates: Partial<User>) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -40,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const storedToken = await SecureStore.getItemAsync('authToken');
       const storedUser = await SecureStore.getItemAsync('userData');
-      
+
       if (storedToken && storedUser) {
         const parsedUser = JSON.parse(storedUser);
         const normalizedUser = { ...parsedUser, role: parsedUser.role || 'user' };
@@ -70,15 +96,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data.success) {
         const { user: userData, token: authToken } = data.data;
         const normalizedUser = { ...userData, role: userData.role || 'user' };
-        
+
         // Store in SecureStore
         await SecureStore.setItemAsync('authToken', authToken);
         await SecureStore.setItemAsync('userData', JSON.stringify(normalizedUser));
-        
+
         // Update state
         setToken(authToken);
         setUser(normalizedUser);
-        
+
         return { success: true, message: data.message, user: normalizedUser, token: authToken };
       } else {
         return { success: false, message: data.message };
@@ -104,15 +130,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data.success) {
         const { user: userData, token: authToken } = data.data;
         const normalizedUser = { ...userData, role: userData.role || 'user' };
-        
+
         // Store in SecureStore
         await SecureStore.setItemAsync('authToken', authToken);
         await SecureStore.setItemAsync('userData', JSON.stringify(normalizedUser));
-        
+
         // Update state
         setToken(authToken);
         setUser(normalizedUser);
-        
+
         return { success: true, message: data.message };
       } else {
         return { success: false, message: data.message };
@@ -237,6 +263,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateUser = async (updates: Partial<User>) => {
+    if (!user) return;
+    const updatedUser = { ...user, ...updates };
+    setUser(updatedUser);
+    await SecureStore.setItemAsync('userData', JSON.stringify(updatedUser));
+  };
+
   const logout = async () => {
     try {
       await SecureStore.deleteItemAsync('authToken');
@@ -249,7 +282,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, requestSignupOtp, verifySignupOtp, resendSignupOtp, register, changePassword, forgotPassword, resetPassword, logout }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, requestSignupOtp, verifySignupOtp, resendSignupOtp, register, changePassword, forgotPassword, resetPassword, updateUser, logout }}>
       {children}
     </AuthContext.Provider>
   );

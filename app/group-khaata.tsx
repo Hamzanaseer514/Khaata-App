@@ -1,8 +1,11 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/DarkModeContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import BottomNav from '@/components/BottomNav';
 import { showError } from '@/utils/toast';
+import { tapHaptic, successHaptic } from '@/utils/haptics';
 import { goBack } from '@/utils/navigation';
+import { useTranslation } from 'react-i18next';
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -38,6 +41,8 @@ interface GroupTransaction {
 export default function GroupKhaataScreen() {
   const { token } = useAuth();
   const { isDarkMode } = useTheme();
+  const { t } = useTranslation();
+  const { currency: cur } = useCurrency();
   const COLORS = isDarkMode ? config.DARK_COLORS : config.LIGHT_COLORS;
   const accent = isDarkMode ? '#22d3ee' : '#0a7ea4';
 
@@ -112,15 +117,15 @@ export default function GroupKhaataScreen() {
         <View style={styles.cardInfo}>
           <Text style={[styles.cardTitle, { color: COLORS.text }]} numberOfLines={1}>{item.description}</Text>
           <Text style={[styles.cardMeta, { color: isDarkMode ? '#64748b' : '#94a3b8' }]} numberOfLines={1}>
-            {formatDate(item.createdAt)} · {item.contactNames.length + 1} members
+            {formatDate(item.createdAt)} · {item.contactNames.length + 1} {t('groupKhaata.members')}
           </Text>
         </View>
 
         {/* Right */}
         <View style={styles.cardRight}>
-          <Text style={[styles.cardAmount, { color: accent }]}>Rs {Math.round(item.totalAmount).toLocaleString()}</Text>
+          <Text style={[styles.cardAmount, { color: accent }]}>{cur.symbol} {Math.round(item.totalAmount).toLocaleString()}</Text>
           <Text style={[styles.cardSplit, { color: isDarkMode ? '#64748b' : '#94a3b8' }]}>
-            {item.splitMode === 'manual' ? 'Custom' : `Rs ${Math.round(item.perPersonShare)}/ea`}
+            {item.splitMode === 'manual' ? 'Custom' : `${cur.symbol} ${Math.round(item.perPersonShare)}/ea`}
           </Text>
         </View>
 
@@ -165,7 +170,7 @@ export default function GroupKhaataScreen() {
         <TouchableOpacity onPress={() => goBack()} hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
           <Ionicons name="chevron-back" size={28} color="#ffffff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Group Khaata</Text>
+        <Text style={styles.headerTitle}>{t('groupKhaata.title')}</Text>
         <TouchableOpacity
           style={styles.headerAddBtn}
           onPress={() => router.push('/group-khaata/create')}
@@ -180,7 +185,7 @@ export default function GroupKhaataScreen() {
           <View style={[styles.emptyIconWrap, { backgroundColor: isDarkMode ? 'rgba(34, 211, 238, 0.05)' : 'rgba(10, 126, 164, 0.05)' }]}>
             <Ionicons name="people-outline" size={70} color={isDarkMode ? 'rgba(34, 211, 238, 0.2)' : 'rgba(10, 126, 164, 0.2)'} />
           </View>
-          <Text style={[styles.emptyTitle, { color: COLORS.text }]}>No Group Transactions</Text>
+          <Text style={[styles.emptyTitle, { color: COLORS.text }]}>{t('groupKhaata.noGroups')}</Text>
           <Text style={[styles.emptyDesc, { color: isDarkMode ? '#64748b' : '#94a3b8' }]}>
             Split expenses with friends and keep track of who owes what
           </Text>
@@ -189,7 +194,7 @@ export default function GroupKhaataScreen() {
             onPress={() => router.push('/group-khaata/create')}
           >
             <Ionicons name="add-circle" size={20} color="#fff" />
-            <Text style={styles.emptyBtnText}>Create Group Transaction</Text>
+            <Text style={styles.emptyBtnText}>{t('groupKhaata.createGroup')}</Text>
           </TouchableOpacity>
         </View>
       ) : (

@@ -2,8 +2,11 @@ import config from '@/config/config';
 import BottomNav from '@/components/BottomNav';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/DarkModeContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { showError, showSuccess } from '@/utils/toast';
+import { tapHaptic, successHaptic, heavyHaptic, selectionHaptic } from '@/utils/haptics';
 import { goBack } from '@/utils/navigation';
+import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -64,6 +67,8 @@ interface PersonalTransaction {
 export default function PersonalKhaataScreen() {
   const { user, token } = useAuth();
   const { isDarkMode } = useTheme();
+  const { t } = useTranslation();
+  const { currency: cur } = useCurrency();
   const COLORS = isDarkMode ? config.DARK_COLORS : config.LIGHT_COLORS;
   const accent = isDarkMode ? '#22d3ee' : '#0a7ea4';
 
@@ -167,7 +172,7 @@ export default function PersonalKhaataScreen() {
         method: 'DELETE', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       });
       const data = await response.json();
-      if (data.success) { showSuccess('Transaction deleted!'); loadTransactions(); }
+      if (data.success) { heavyHaptic(); showSuccess('Transaction deleted!'); loadTransactions(); }
       else showError(data.message || 'Failed to delete');
     } catch (error) { console.error('Delete error:', error); showError('Failed to delete transaction.'); }
     finally { setShowDeleteConfirm(false); setTransactionToDelete(null); }
@@ -180,7 +185,7 @@ export default function PersonalKhaataScreen() {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  const formatAmount = (amount: number) => `Rs ${Math.abs(amount).toLocaleString()}`;
+  const formatAmount = (amount: number) => `${cur.symbol} ${Math.abs(amount).toLocaleString()}`;
 
   const renderTransaction = ({ item }: { item: PersonalTransaction }) => {
     const isIncome = item.type === 'INCOME';
@@ -281,7 +286,7 @@ export default function PersonalKhaataScreen() {
         <TouchableOpacity onPress={() => goBack()} hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
           <Ionicons name="chevron-back" size={28} color="#ffffff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Personal Khaata</Text>
+        <Text style={styles.headerTitle}>{t('personalKhaata.title')}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <TouchableOpacity
             style={styles.headerAddBtn}
@@ -373,12 +378,12 @@ export default function PersonalKhaataScreen() {
                     : (isDarkMode ? 'rgba(255,255,255,0.05)' : '#ffffff'),
                   borderColor: active ? chipColor : (isDarkMode ? 'rgba(255,255,255,0.08)' : '#e2e8f0'),
                 }]}
-                onPress={() => setFilterType(f)}
+                onPress={() => { selectionHaptic(); setFilterType(f); }}
               >
                 <Text style={[styles.typeTabText, {
                   color: active ? (f === 'ALL' ? '#fff' : chipColor) : (isDarkMode ? '#94a3b8' : '#475569'),
                 }]}>
-                  {f === 'ALL' ? 'All' : f === 'INCOME' ? 'Income' : 'Expense'}
+                  {f === 'ALL' ? t('personalKhaata.all') : f === 'INCOME' ? t('personalKhaata.income') : t('personalKhaata.expense')}
                 </Text>
               </TouchableOpacity>
             );
@@ -390,7 +395,7 @@ export default function PersonalKhaataScreen() {
       <DropdownModal
         visible={showYearDropdown}
         onClose={() => setShowYearDropdown(false)}
-        title="Select Year"
+        title={t('personalKhaata.selectYear')}
         items={yearList.map(y => ({ label: String(y), value: y }))}
         selected={selectedYear}
         onSelect={(v) => { setSelectedYear(v as number); setShowYearDropdown(false); }}
@@ -403,7 +408,7 @@ export default function PersonalKhaataScreen() {
       <DropdownModal
         visible={showMonthDropdown}
         onClose={() => setShowMonthDropdown(false)}
-        title="Select Month"
+        title={t('personalKhaata.selectMonth')}
         items={allMonths}
         selected={selectedMonth}
         onSelect={(v) => { setSelectedMonth(v as number); setShowMonthDropdown(false); }}
@@ -419,9 +424,9 @@ export default function PersonalKhaataScreen() {
           borderColor: isDarkMode ? 'rgba(34, 197, 94, 0.2)' : '#bbf7d0',
         }]}>
           <Ionicons name="arrow-down-circle" size={20} color={isDarkMode ? '#34d399' : '#10b981'} />
-          <Text style={[styles.summaryLabel, { color: isDarkMode ? '#94a3b8' : '#64748b' }]}>Income</Text>
+          <Text style={[styles.summaryLabel, { color: isDarkMode ? '#94a3b8' : '#64748b' }]}>{t('personalKhaata.income')}</Text>
           <Text style={[styles.summaryValue, { color: isDarkMode ? '#34d399' : '#10b981' }]} numberOfLines={1}>
-            +Rs {summary.totalIncome.toLocaleString()}
+            +{cur.symbol} {summary.totalIncome.toLocaleString()}
           </Text>
         </View>
         <View style={[styles.summaryCard, {
@@ -429,9 +434,9 @@ export default function PersonalKhaataScreen() {
           borderColor: isDarkMode ? 'rgba(239, 68, 68, 0.2)' : '#fecaca',
         }]}>
           <Ionicons name="arrow-up-circle" size={20} color={isDarkMode ? '#f87171' : '#ef4444'} />
-          <Text style={[styles.summaryLabel, { color: isDarkMode ? '#94a3b8' : '#64748b' }]}>Expense</Text>
+          <Text style={[styles.summaryLabel, { color: isDarkMode ? '#94a3b8' : '#64748b' }]}>{t('personalKhaata.expense')}</Text>
           <Text style={[styles.summaryValue, { color: isDarkMode ? '#f87171' : '#ef4444' }]} numberOfLines={1}>
-            -Rs {summary.totalExpense.toLocaleString()}
+            -{cur.symbol} {summary.totalExpense.toLocaleString()}
           </Text>
         </View>
         <View style={[styles.summaryCard, {
@@ -439,11 +444,11 @@ export default function PersonalKhaataScreen() {
           borderColor: isDarkMode ? 'rgba(34, 211, 238, 0.2)' : '#bae6fd',
         }]}>
           <Ionicons name="wallet" size={20} color={accent} />
-          <Text style={[styles.summaryLabel, { color: isDarkMode ? '#94a3b8' : '#64748b' }]}>Balance</Text>
+          <Text style={[styles.summaryLabel, { color: isDarkMode ? '#94a3b8' : '#64748b' }]}>{t('personalKhaata.balance')}</Text>
           <Text style={[styles.summaryValue, {
             color: summary.netBalance >= 0 ? (isDarkMode ? '#34d399' : '#10b981') : (isDarkMode ? '#f87171' : '#ef4444')
           }]} numberOfLines={1}>
-            {summary.netBalance >= 0 ? '+' : ''}Rs {summary.netBalance.toLocaleString()}
+            {summary.netBalance >= 0 ? '+' : ''}{cur.symbol} {summary.netBalance.toLocaleString()}
           </Text>
         </View>
       </View>
@@ -455,7 +460,7 @@ export default function PersonalKhaataScreen() {
             <Ionicons name="receipt-outline" size={70} color={isDarkMode ? 'rgba(34, 211, 238, 0.2)' : 'rgba(10, 126, 164, 0.2)'} />
           </View>
           <Text style={[styles.emptyTitle, { color: COLORS.text }]}>
-            {allTransactions.length === 0 ? 'No Transactions Yet' : 'No Results'}
+            {allTransactions.length === 0 ? t('personalKhaata.noTransactions') : 'No Results'}
           </Text>
           <Text style={[styles.emptyDesc, { color: isDarkMode ? '#64748b' : '#94a3b8' }]}>
             {allTransactions.length === 0
@@ -509,7 +514,7 @@ export default function PersonalKhaataScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.confirmModal, { backgroundColor: isDarkMode ? '#1e293b' : '#ffffff' }]}>
             <Ionicons name="warning-outline" size={40} color="#ef4444" style={{ alignSelf: 'center', marginBottom: 12 }} />
-            <Text style={[styles.confirmTitle, { color: COLORS.text }]}>Delete transaction?</Text>
+            <Text style={[styles.confirmTitle, { color: COLORS.text }]}>{t('personalKhaata.deleteTransaction')}</Text>
             <Text style={[styles.confirmDesc, { color: isDarkMode ? '#94a3b8' : '#7f8c8d' }]}>
               This action cannot be undone.
             </Text>
@@ -518,10 +523,10 @@ export default function PersonalKhaataScreen() {
                 style={[styles.confirmCancelBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : '#f3f4f6' }]}
                 onPress={() => { setShowDeleteConfirm(false); setTransactionToDelete(null); }}
               >
-                <Text style={[styles.confirmCancelText, { color: COLORS.text }]}>Cancel</Text>
+                <Text style={[styles.confirmCancelText, { color: COLORS.text }]}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.confirmDeleteBtn} onPress={confirmDelete}>
-                <Text style={styles.confirmDeleteText}>Delete</Text>
+                <Text style={styles.confirmDeleteText}>{t('common.delete')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -586,6 +591,8 @@ function TransactionFormModal({ mode, transaction, onClose, onSuccess }: {
 }) {
   const { token } = useAuth();
   const { isDarkMode } = useTheme();
+  const { t } = useTranslation();
+  const { currency: cur } = useCurrency();
   const COLORS = isDarkMode ? config.DARK_COLORS : config.LIGHT_COLORS;
   const accent = isDarkMode ? '#22d3ee' : '#0a7ea4';
   const cardBg = isDarkMode ? COLORS.surface : '#ffffff';
@@ -630,7 +637,7 @@ function TransactionFormModal({ mode, transaction, onClose, onSuccess }: {
         }),
       });
       const data = await response.json();
-      if (data.success) { showSuccess(mode === 'add' ? 'Transaction added!' : 'Transaction updated!'); onSuccess(); }
+      if (data.success) { successHaptic(); showSuccess(mode === 'add' ? 'Transaction added!' : 'Transaction updated!'); onSuccess(); }
       else showError(data.message || 'Failed');
     } catch (error) { console.error(`${mode} error:`, error); showError('Something went wrong.'); }
     finally { setIsLoading(false); }
@@ -651,7 +658,7 @@ function TransactionFormModal({ mode, transaction, onClose, onSuccess }: {
           {/* Header */}
           <View style={styles.formHeader}>
             <Text style={[styles.formTitle, { color: COLORS.text }]}>
-              {mode === 'add' ? 'Add Transaction' : 'Edit Transaction'}
+              {mode === 'add' ? t('personalKhaata.addTransaction') : t('personalKhaata.editTransaction')}
             </Text>
             <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
               <Ionicons name="close" size={24} color={COLORS.textMuted} />
@@ -662,7 +669,7 @@ function TransactionFormModal({ mode, transaction, onClose, onSuccess }: {
             <View style={styles.formBody}>
               {/* Big Amount */}
               <View style={styles.bigAmountRow}>
-                <Text style={[styles.bigCurrency, { color: COLORS.primary }]}>Rs</Text>
+                <Text style={[styles.bigCurrency, { color: COLORS.primary }]}>{cur.symbol}</Text>
                 <TextInput
                   style={[styles.bigAmountInput, { color: COLORS.text }]}
                   placeholder="0"
@@ -685,7 +692,7 @@ function TransactionFormModal({ mode, transaction, onClose, onSuccess }: {
                   onPress={() => setType('INCOME')}
                 >
                   <Ionicons name="arrow-down-circle" size={24} color={type === 'INCOME' ? '#059669' : COLORS.textMuted} />
-                  <Text style={[styles.typeToggleText, { color: type === 'INCOME' ? '#059669' : COLORS.textMuted }]}>Income</Text>
+                  <Text style={[styles.typeToggleText, { color: type === 'INCOME' ? '#059669' : COLORS.textMuted }]}>{t('personalKhaata.income')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.typeToggle, {
@@ -695,7 +702,7 @@ function TransactionFormModal({ mode, transaction, onClose, onSuccess }: {
                   onPress={() => setType('EXPENSE')}
                 >
                   <Ionicons name="arrow-up-circle" size={24} color={type === 'EXPENSE' ? '#dc2626' : COLORS.textMuted} />
-                  <Text style={[styles.typeToggleText, { color: type === 'EXPENSE' ? '#dc2626' : COLORS.textMuted }]}>Expense</Text>
+                  <Text style={[styles.typeToggleText, { color: type === 'EXPENSE' ? '#dc2626' : COLORS.textMuted }]}>{t('personalKhaata.expense')}</Text>
                 </TouchableOpacity>
               </View>
 

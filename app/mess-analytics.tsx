@@ -2,6 +2,7 @@ import BottomNav from '@/components/BottomNav';
 import config from '@/config/config';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/DarkModeContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { goBack } from '@/utils/navigation';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -32,6 +33,7 @@ interface Analytics {
 export default function MessAnalyticsScreen() {
   const { user, token } = useAuth();
   const { isDarkMode } = useTheme();
+  const { currency: cur } = useCurrency();
   const COLORS = isDarkMode ? config.DARK_COLORS : config.LIGHT_COLORS;
   const accent = isDarkMode ? '#22d3ee' : '#0a7ea4';
   const cardBg = isDarkMode ? COLORS.surface : '#ffffff';
@@ -90,8 +92,17 @@ export default function MessAnalyticsScreen() {
         setAnalytics(null); return;
       }
       const data = await res.json();
-      if (data.success) { setMonthlySummary(data.data.summary); setAnalytics(data.data.analytics); }
-      else { setMonthlySummary(null); setAnalytics(null); }
+      if (data.success) {
+        const s = data.data.summary || {};
+        setMonthlySummary({
+          totalAmount: s.totalAmount || 0,
+          totalMeals: s.totalMeals || 0,
+          month: start.getMonth() + 1,
+          year: start.getFullYear(),
+          monthName: monthNames[start.getMonth()],
+        });
+        setAnalytics(data.data.analytics || null);
+      } else { setMonthlySummary(null); setAnalytics(null); }
     } catch (e) { console.log('Error:', e); setMonthlySummary(null); setAnalytics(null); }
     finally { setIsLoading(false); }
   };
@@ -134,7 +145,7 @@ export default function MessAnalyticsScreen() {
     loadSpecificMonth(selectedYear, selectedMonth);
   };
 
-  const formatPrice = (p: number) => `Rs ${Math.round(isFinite(p) ? p : 0).toLocaleString()}`;
+  const formatPrice = (p: number) => `${cur.symbol} ${Math.round(isFinite(p) ? p : 0).toLocaleString()}`;
 
   // Year list and filtered months
   const currentYear = new Date().getFullYear();
@@ -183,7 +194,7 @@ export default function MessAnalyticsScreen() {
       <View style={styles.dateBar}>
         <View style={{ flex: 1 }}>
           <Text style={[styles.dateBarTitle, { color: COLORS.text }]}>
-            {monthlySummary ? `${monthlySummary.monthName} ${monthlySummary.year}` : `${monthNames[selectedMonth - 1]} ${selectedYear}`}
+            {activeRange === 'today' ? 'Today' : activeRange === 'yesterday' ? 'Yesterday' : activeRange === 'last7' ? 'Last 7 Days' : activeRange === 'last30' ? 'Last 30 Days' : monthlySummary ? `${monthlySummary.monthName} ${monthlySummary.year}` : `${monthNames[selectedMonth - 1]} ${selectedYear}`}
           </Text>
           <Text style={[styles.dateBarSub, { color: COLORS.textMuted }]}>
             {monthlySummary ? `${monthlySummary.totalMeals} meals · ${formatPrice(monthlySummary.totalAmount)}` : 'Select a period to view'}
@@ -294,7 +305,7 @@ export default function MessAnalyticsScreen() {
                     onPress={() => handleMonthTap(m.year, m.month)}
                   >
                     <Text style={[styles.monthPillTitle, { color: isActive ? (isDarkMode ? '#0a0a0c' : '#fff') : COLORS.text }]}>{m.monthName.substring(0, 3)}</Text>
-                    <Text style={[styles.monthPillAmount, { color: isActive ? (isDarkMode ? '#0a0a0c' : '#fff') : accent }]}>Rs {Math.round(m.totalAmount).toLocaleString()}</Text>
+                    <Text style={[styles.monthPillAmount, { color: isActive ? (isDarkMode ? '#0a0a0c' : '#fff') : accent }]}>{cur.symbol} {Math.round(m.totalAmount).toLocaleString()}</Text>
                     <Text style={[styles.monthPillMeals, { color: isActive ? (isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.8)') : COLORS.textMuted }]}>{m.totalMeals} meals</Text>
                   </TouchableOpacity>
                 );
@@ -347,7 +358,7 @@ export default function MessAnalyticsScreen() {
                   </View>
                   <View style={[styles.smallStatCard, { backgroundColor: cardBg, borderColor }]}>
                     <Ionicons name="cash-outline" size={18} color={isDarkMode ? '#34d399' : '#10b981'} />
-                    <Text style={[styles.smallStatValue, { color: COLORS.text }]}>Rs {Math.round(analytics.avgSpentPerDay)}</Text>
+                    <Text style={[styles.smallStatValue, { color: COLORS.text }]}>{cur.symbol} {Math.round(analytics.avgSpentPerDay)}</Text>
                     <Text style={[styles.smallStatLabel, { color: COLORS.textMuted }]}>Spent/Day</Text>
                   </View>
                 </View>
@@ -397,7 +408,7 @@ export default function MessAnalyticsScreen() {
                           borderColor: isDarkMode ? `${color}20` : `${color}15`,
                         }]}>
                           <Ionicons name={MEAL_ICONS[type] as any} size={20} color={color} />
-                          <Text style={[styles.costValue, { color }]}>Rs {Math.round(avg)}</Text>
+                          <Text style={[styles.costValue, { color }]}>{cur.symbol} {Math.round(avg)}</Text>
                           <Text style={[styles.costLabel, { color: COLORS.textMuted }]}>{type}</Text>
                         </View>
                       );

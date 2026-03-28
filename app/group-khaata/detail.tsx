@@ -1,5 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/DarkModeContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { showError } from '@/utils/toast';
 import { router, useLocalSearchParams } from 'expo-router';
 import { goBack } from '@/utils/navigation';
@@ -37,6 +38,7 @@ export default function GroupTransactionDetailScreen() {
   const { transactionId } = useLocalSearchParams();
   const { token } = useAuth();
   const { isDarkMode } = useTheme();
+  const { currency: cur } = useCurrency();
   const COLORS = isDarkMode ? config.DARK_COLORS : config.LIGHT_COLORS;
   const accent = isDarkMode ? '#22d3ee' : '#0a7ea4';
   const cardBg = isDarkMode ? COLORS.surface : '#ffffff';
@@ -121,14 +123,14 @@ export default function GroupTransactionDetailScreen() {
           <View style={styles.overviewAmounts}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.amountLabel, { color: COLORS.textMuted }]}>Total Amount</Text>
-              <Text style={[styles.amountBig, { color: accent }]}>Rs {Math.round(transaction.totalAmount).toLocaleString()}</Text>
+              <Text style={[styles.amountBig, { color: accent }]}>{cur.symbol} {Math.round(transaction.totalAmount).toLocaleString()}</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
               <Text style={[styles.amountLabel, { color: COLORS.textMuted }]}>
                 {transaction.splitMode === 'manual' ? 'Split Type' : 'Per Person'}
               </Text>
               <Text style={[styles.amountSmall, { color: isDarkMode ? '#34d399' : '#10b981' }]}>
-                {transaction.splitMode === 'manual' ? 'Custom' : `Rs ${Math.round(transaction.perPersonShare)}`}
+                {transaction.splitMode === 'manual' ? 'Custom' : `${cur.symbol} ${Math.round(transaction.perPersonShare)}`}
               </Text>
             </View>
           </View>
@@ -163,13 +165,11 @@ export default function GroupTransactionDetailScreen() {
                   {transaction.contactProfilePictures?.[index] ? (
                     <Image source={{ uri: transaction.contactProfilePictures[index]! }} style={{ width: 36, height: 36, borderRadius: 18 }} contentFit="cover" />
                   ) : (
-                    <Text style={[styles.memberAvatarText, { color: accent }]}>
-                      {name.charAt(0).toUpperCase()}
-                    </Text>
+                    <Image source={require('../../assets/images/avatar_male_2.png')} style={{ width: 36, height: 36, borderRadius: 18 }} contentFit="cover" />
                   )}
                 </View>
                 <Text style={[styles.memberName, { color: COLORS.text }]} numberOfLines={1}>{name}</Text>
-                <Text style={[styles.memberAmount, { color: accent }]}>Rs {Math.round(amount).toLocaleString()}</Text>
+                <Text style={[styles.memberAmount, { color: accent }]}>{cur.symbol} {Math.round(amount).toLocaleString()}</Text>
               </View>
             );
           })}
@@ -182,7 +182,7 @@ export default function GroupTransactionDetailScreen() {
               </View>
               <Text style={[styles.memberName, { color: COLORS.text }]}>You</Text>
               <Text style={[styles.memberAmount, { color: isDarkMode ? '#22d3ee' : '#0a7ea4' }]}>
-                Rs {Math.round(transaction.userAmount).toLocaleString()}
+                {cur.symbol} {Math.round(transaction.userAmount).toLocaleString()}
               </Text>
             </View>
           )}
@@ -199,25 +199,25 @@ export default function GroupTransactionDetailScreen() {
             <>
               <View style={styles.summaryRow}>
                 <Text style={[styles.summaryLabel, { color: COLORS.textMuted }]}>Your Share</Text>
-                <Text style={[styles.summaryValue, { color: COLORS.text }]}>Rs {transaction.userAmount || 0}</Text>
+                <Text style={[styles.summaryValue, { color: COLORS.text }]}>{cur.symbol} {transaction.userAmount || 0}</Text>
               </View>
               <View style={styles.summaryRow}>
                 <Text style={[styles.summaryLabel, { color: COLORS.textMuted }]}>Contacts Total</Text>
                 <Text style={[styles.summaryValue, { color: COLORS.text }]}>
-                  Rs {transaction.individualAmounts ? Object.values(transaction.individualAmounts).reduce((s, a) => s + a, 0) : 0}
+                  {cur.symbol} {transaction.individualAmounts ? Object.values(transaction.individualAmounts).reduce((s, a) => s + a, 0) : 0}
                 </Text>
               </View>
             </>
           ) : (
             <View style={styles.summaryRow}>
               <Text style={[styles.summaryLabel, { color: COLORS.textMuted }]}>Per Person Share</Text>
-              <Text style={[styles.summaryValue, { color: COLORS.text }]}>Rs {transaction.perPersonShare}</Text>
+              <Text style={[styles.summaryValue, { color: COLORS.text }]}>{cur.symbol} {transaction.perPersonShare}</Text>
             </View>
           )}
           <View style={[styles.divider, { backgroundColor: borderColor }]} />
           <View style={styles.summaryRow}>
             <Text style={[styles.summaryTotalLabel, { color: COLORS.text }]}>Amount Paid</Text>
-            <Text style={[styles.summaryTotalValue, { color: accent }]}>Rs {Math.round(transaction.totalAmount).toLocaleString()}</Text>
+            <Text style={[styles.summaryTotalValue, { color: accent }]}>{cur.symbol} {Math.round(transaction.totalAmount).toLocaleString()}</Text>
           </View>
         </View>
 

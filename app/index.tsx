@@ -2,6 +2,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/DarkModeContext';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -71,13 +72,19 @@ export default function WelcomeScreen() {
     });
   }, []);
 
-  // Navigate based on auth state
+  // Navigate based on auth state + onboarding
   useEffect(() => {
     if (!hasAnimated) return;
-    
     if (isLoading) return;
 
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
+      // Check if onboarding is done
+      const onboardingDone = await AsyncStorage.getItem('@khaata_onboarding_done');
+      if (!onboardingDone) {
+        router.replace('/onboarding');
+        return;
+      }
+
       if (user) {
         if (user.role === 'admin') {
           router.replace('/admin');
@@ -87,7 +94,7 @@ export default function WelcomeScreen() {
       } else {
         router.replace('/login');
       }
-    }, 1500); // Slightly longer for premium feel
+    }, 1500);
 
     return () => clearTimeout(timer);
   }, [user, isLoading, hasAnimated]);

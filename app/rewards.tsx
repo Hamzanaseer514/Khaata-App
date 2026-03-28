@@ -2,6 +2,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/DarkModeContext';
 import config from '@/config/config';
 import { goBack } from '@/utils/navigation';
+import { tapHaptic, successHaptic } from '@/utils/haptics';
+import { showSuccess, showError } from '@/utils/toast';
+import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
 import React, { useEffect, useState, useRef } from 'react';
 import {
@@ -16,6 +19,7 @@ import {
   StatusBar,
   ActivityIndicator,
   Platform,
+  Share,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import BottomNav from '@/components/BottomNav';
@@ -39,12 +43,16 @@ interface RewardHistory {
 export default function RewardsScreen() {
   const { token } = useAuth();
   const { isDarkMode } = useTheme();
+  const { t } = useTranslation();
   const COLORS = isDarkMode ? config.DARK_COLORS : config.LIGHT_COLORS;
   const styles = createStyles(COLORS, isDarkMode);
 
   const [summary, setSummary] = useState<RewardSummary | null>(null);
   const [history, setHistory] = useState<RewardHistory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [todayShares, setTodayShares] = useState(0);
+  const [isSharing, setIsSharing] = useState(false);
+  const [totalShares, setTotalShares] = useState(0);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -55,13 +63,16 @@ export default function RewardsScreen() {
 
   const fetchData = async () => {
     try {
-      const [summaryRes, historyRes] = await Promise.all([
+      const [summaryRes, historyRes, shareRes] = await Promise.all([
         fetch(`${config.BASE_URL}/rewards/summary`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
         fetch(`${config.BASE_URL}/rewards/history`, {
           headers: { 'Authorization': `Bearer ${token}` }
-        })
+        }),
+        fetch(`${config.BASE_URL}/rewards/share-stats`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }).catch(() => null),
       ]);
 
       const summaryData = await summaryRes.json();
@@ -69,6 +80,14 @@ export default function RewardsScreen() {
 
       if (summaryData.success) setSummary(summaryData.data);
       if (historyData.success) setHistory(historyData.data);
+
+      if (shareRes) {
+        const shareData = await shareRes.json();
+        if (shareData.success) {
+          setTodayShares(shareData.data.todayShares);
+          setTotalShares(shareData.data.totalShares);
+        }
+      }
       
       Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true }).start();
       
@@ -80,6 +99,40 @@ export default function RewardsScreen() {
       console.error('Fetch rewards error:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const shareApp = async () => {
+    setIsSharing(true);
+    try {
+      const result = await Share.share({
+        message: 'Try KhaataWise - the smartest way to track money with friends! Download now: https://play.google.com/store/apps/details?id=com.khaata.app',
+        title: 'KhaataWise - Smart Ledger App',
+      });
+
+      if (result.action === Share.sharedAction) {
+        // User actually shared - award points
+        const res = await fetch(`${config.BASE_URL}/rewards/share`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (data.data.pointsAwarded > 0) {
+            successHaptic();
+            showSuccess(`+${data.data.pointsAwarded} coins earned!`);
+            setSummary(prev => prev ? { ...prev, points: data.data.points, level: data.data.level } : prev);
+            setTodayShares(data.data.todayShares);
+            fetchData(); // refresh history
+          } else {
+            showSuccess(data.message);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Share error:', e);
+    } finally {
+      setIsSharing(false);
     }
   };
 
@@ -117,7 +170,7 @@ export default function RewardsScreen() {
           <TouchableOpacity onPress={() => goBack()} style={styles.backButton}>
             <Ionicons name="chevron-back" size={24} color={COLORS.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Khaata Coins</Text>
+          <Text style={styles.headerTitle}>{t('rewards.title')}</Text>
           <View style={{ width: 40 }} />
         </View>
 
@@ -125,7 +178,7 @@ export default function RewardsScreen() {
         <Animated.View style={[styles.levelCard, { opacity: fadeAnim }]}>
           <MaterialCommunityIcons name="trophy-outline" size={60} color={levelColor} />
           <Text style={[styles.levelText, { color: levelColor }]}>{summary?.level.toUpperCase()} TIER</Text>
-          <Text style={styles.pointsText}>{summary?.points || 0} Coins</Text>
+          <Text style={styles.pointsText}>{summary?.points || 0} {t('rewards.coins')}</Text>
           
           <View style={styles.progressContainer}>
             <View style={styles.progressBarBackground}>
@@ -151,22 +204,73 @@ export default function RewardsScreen() {
 
         {/* Milestone Tracker */}
         <View style={styles.milestoneSection}>
-          <Text style={styles.sectionTitle}>Daily Milestone</Text>
+          <Text style={styles.sectionTitle}>{t('rewards.dailyMilestone')}</Text>
           <View style={styles.milestoneCard}>
             <View style={styles.milestoneInfo}>
-              <Text style={styles.milestoneTitle}>5 Transactions Daily</Text>
-              <Text style={styles.milestoneSub}>Earn bonus +50 coins</Text>
+              <Text style={styles.milestoneTitle}>{t('rewards.fiveTransactions')}</Text>
+              <Text style={styles.milestoneSub}>{t('rewards.earnBonus')}</Text>
             </View>
             <View style={styles.milestoneProgress}>
               <Text style={styles.milestoneTarget}>{summary?.dailyCount || 0}/5</Text>
-              <Text style={styles.milestoneStatus}>{summary?.dailyCount === 5 ? 'COMPLETED' : 'IN PROGRESS'}</Text>
+              <Text style={styles.milestoneStatus}>{summary?.dailyCount === 5 ? t('rewards.completed') : t('rewards.inProgress')}</Text>
             </View>
+          </View>
+        </View>
+
+        {/* Share & Earn */}
+        <View style={styles.milestoneSection}>
+          <Text style={styles.sectionTitle}>Share & Earn</Text>
+          <View style={[styles.shareCard, { backgroundColor: isDarkMode ? 'rgba(34,211,238,0.06)' : '#f0f9ff', borderColor: isDarkMode ? 'rgba(34,211,238,0.15)' : '#bae6fd' }]}>
+            <View style={styles.shareCardTop}>
+              <View style={[styles.shareIconWrap, { backgroundColor: COLORS.primary + '20' }]}>
+                <Ionicons name="gift-outline" size={28} color={COLORS.primary} />
+              </View>
+              <View style={{ flex: 1, marginLeft: 14 }}>
+                <Text style={[styles.milestoneTitle, { color: COLORS.text }]}>Share KhaataWise</Text>
+                <Text style={[styles.milestoneSub, { color: COLORS.textMuted }]}>Earn 10 coins per share (max 5/day)</Text>
+              </View>
+            </View>
+
+            {/* Progress dots */}
+            <View style={styles.shareDots}>
+              {[0, 1, 2, 3, 4].map(i => (
+                <View key={i} style={[styles.shareDot, {
+                  backgroundColor: i < todayShares ? COLORS.primary : (isDarkMode ? 'rgba(255,255,255,0.08)' : '#e2e8f0'),
+                }]}>
+                  {i < todayShares && <Ionicons name="checkmark" size={12} color="#fff" />}
+                </View>
+              ))}
+              <Text style={[styles.shareProgress, { color: COLORS.textMuted }]}>{todayShares}/5 today</Text>
+            </View>
+
+            {/* Share button */}
+            <TouchableOpacity
+              style={[styles.shareBtn, { backgroundColor: COLORS.primary, opacity: isSharing || todayShares >= 5 ? 0.5 : 1 }]}
+              onPress={shareApp}
+              disabled={isSharing || todayShares >= 5}
+              activeOpacity={0.8}
+            >
+              {isSharing ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="share-social-outline" size={20} color="#fff" />
+                  <Text style={styles.shareBtnText}>{todayShares >= 5 ? 'Come back tomorrow!' : 'Share & Earn 10 Coins'}</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {totalShares > 0 && (
+              <Text style={[styles.shareStats, { color: COLORS.textMuted }]}>
+                Total shares: {totalShares} · Earned: {totalShares * 10} coins
+              </Text>
+            )}
           </View>
         </View>
 
         {/* History */}
         <View style={styles.historySection}>
-          <Text style={styles.sectionTitle}>Recent Earnings</Text>
+          <Text style={styles.sectionTitle}>{t('rewards.recentEarnings')}</Text>
           {history.length > 0 ? (
             history.map(item => (
               <View key={item._id}>{renderHistoryItem({ item })}</View>
@@ -277,5 +381,14 @@ const createStyles = (COLORS: any, isDarkMode: boolean) => StyleSheet.create({
   historyReason: { fontSize: 15, fontWeight: '700', color: COLORS.text },
   historyDate: { fontSize: 12, color: COLORS.textMuted, marginTop: 2 },
   historyPoints: { fontSize: 16, fontWeight: '900', color: COLORS.primary },
-  emptyText: { textAlign: 'center', color: COLORS.textMuted, marginTop: 20, fontSize: 14, fontWeight: '500' }
+  emptyText: { textAlign: 'center', color: COLORS.textMuted, marginTop: 20, fontSize: 14, fontWeight: '500' },
+  shareCard: { borderRadius: 16, borderWidth: 1, padding: 18, marginTop: 12 },
+  shareCardTop: { flexDirection: 'row', alignItems: 'center' },
+  shareIconWrap: { width: 50, height: 50, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  shareDots: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16, marginBottom: 16 },
+  shareDot: { width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  shareProgress: { fontSize: 12, fontWeight: '600', marginLeft: 4 },
+  shareBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 12 },
+  shareBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  shareStats: { textAlign: 'center', fontSize: 11, fontWeight: '600', marginTop: 12 }
 });

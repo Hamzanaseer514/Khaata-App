@@ -1,115 +1,96 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { authenticateWithBiometric, getBiometricPreference } from '@/utils/biometric';
+import { useTheme } from '@/contexts/DarkModeContext';
+import config from '@/config/config';
 import { router, useSegments } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, AppStateStatus, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { AppState, AppStateStatus, StyleSheet, Text, TouchableOpacity, View, StatusBar, Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function AuthWrapper({ children }: { children: React.ReactNode }) {
   const { user, isLoading, logout } = useAuth();
+  const { isDarkMode } = useTheme();
   const segments = useSegments();
-  const [isCheckingBiometric, setIsCheckingBiometric] = useState(false);
-  const [showBiometricModal, setShowBiometricModal] = useState(false);
+  const COLORS = isDarkMode ? config.DARK_COLORS : config.LIGHT_COLORS;
+  const accent = isDarkMode ? '#22d3ee' : '#0a7ea4';
+
+  const [biometricLocked, setBiometricLocked] = useState(false);
+  const [biometricFailed, setBiometricFailed] = useState(false);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
   const biometricChecked = useRef(false);
   const appState = useRef(AppState.currentState);
 
-  // Biometric check function
-  const performBiometricCheck = useCallback(async (force = false) => {
-    if (isLoading || !user) return;
-    
-    // Don't check if already checked unless forced (app coming to foreground)
-    if (!force && biometricChecked.current) return;
-    
-    const currentSegments = segments;
-    const inAuthScreens = currentSegments[0] === 'login' || currentSegments[0] === 'register' || currentSegments[0] === 'verify-otp';
-    if (inAuthScreens) return; // Don't check biometric on auth screens
+  const isAuthScreen = segments[0] === 'login' || segments[0] === 'register' || segments[0] === 'verify-otp' || segments[0] === 'forgot-password' || segments[0] === 'reset-password';
+
+  const performBiometricCheck = useCallback(async () => {
+    if (isLoading || !user || isAuthScreen) return;
 
     try {
-      const biometricEnabled = await getBiometricPreference();
-      if (biometricEnabled) {
-        if (force) {
-          // Reset check flag when app comes to foreground
-          biometricChecked.current = false;
-        }
-        
-        biometricChecked.current = true;
-        setIsCheckingBiometric(true);
+      const enabled = await getBiometricPreference();
+      if (!enabled) {
+        setBiometricLocked(false);
+        return;
+      }
 
-        // Show biometric prompt directly
-        const result = await authenticateWithBiometric();
-        
-        if (result.success) {
-          // Biometric success - allow access
-          setIsCheckingBiometric(false);
-        } else {
-          // Biometric failed or cancelled - show modal with retry option
-          setIsCheckingBiometric(false);
-          setShowBiometricModal(true);
-        }
+      setBiometricLocked(true);
+      setBiometricFailed(false);
+      setIsAuthenticating(true);
+
+      const result = await authenticateWithBiometric();
+
+      if (result.success) {
+        setBiometricLocked(false);
+        setBiometricFailed(false);
+        biometricChecked.current = true;
+      } else {
+        setBiometricFailed(true);
       }
     } catch (error) {
       console.error('Biometric check error:', error);
-      setIsCheckingBiometric(false);
-      // On error, still show modal to allow retry
-      const biometricEnabled = await getBiometricPreference().catch(() => false);
-      if (biometricEnabled) {
-        setShowBiometricModal(true);
-      }
+      setBiometricFailed(true);
+    } finally {
+      setIsAuthenticating(false);
     }
-  }, [isLoading, user, segments]);
+  }, [isLoading, user, isAuthScreen]);
 
-  // Check biometric authentication when user is authenticated (app opens)
+  // Initial biometric check
   useEffect(() => {
-    performBiometricCheck(false);
-  }, [user, isLoading, segments, performBiometricCheck]);
+    if (!biometricChecked.current && user && !isLoading && !isAuthScreen) {
+      performBiometricCheck();
+    }
+  }, [user, isLoading, isAuthScreen, performBiometricCheck]);
 
-  // Check biometric when app comes to foreground
+  // App foreground check
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
-      if (
-        appState.current.match(/inactive|background/) &&
-        nextAppState === 'active' &&
-        user // Only check if user is logged in
-      ) {
-        // App has come to the foreground, check biometric
-        performBiometricCheck(true);
+    const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
+      if (appState.current.match(/inactive|background/) && next === 'active' && user && !isAuthScreen) {
+        biometricChecked.current = false;
+        performBiometricCheck();
       }
-      appState.current = nextAppState;
+      appState.current = next;
     });
+    return () => sub.remove();
+  }, [user, isAuthScreen, performBiometricCheck]);
 
-    return () => {
-      subscription.remove();
-    };
-  }, [user, performBiometricCheck]);
-
-  // Reset biometric check flag when user logs out
+  // Reset on logout
   useEffect(() => {
     if (!user) {
       biometricChecked.current = false;
-      setShowBiometricModal(false);
+      setBiometricLocked(false);
+      setBiometricFailed(false);
     }
   }, [user]);
 
-  React.useEffect(() => {
+  // Navigation logic
+  useEffect(() => {
     if (isLoading) return;
-
     const inDashboard = segments[0] === 'dashboard';
     const inAdmin = segments[0] === 'admin';
     const inProtected = inDashboard || inAdmin;
-    const inAuthScreens = segments[0] === 'login' || segments[0] === 'register' || segments[0] === 'verify-otp';
-
-    console.log('AuthWrapper - segments:', segments);   
-    console.log('AuthWrapper - user:', user);
-    console.log('AuthWrapper - inAuthScreens:', inAuthScreens);
-    console.log('AuthWrapper - inDashboard:', inDashboard); 
-    console.log('AuthWrapper - inAdmin:', inAdmin); 
 
     if (!user && inProtected) {
-      // User is not authenticated but trying to access protected routes
-      console.log('Redirecting to login');
       router.replace('/login');
-    } else if (user && inAuthScreens) {
-      // User is authenticated but on auth screens, redirect to main app
-      console.log('Redirecting to dashboard');
+    } else if (user && isAuthScreen) {
       if (user.role === 'admin') {
         router.replace('/admin');
       } else {
@@ -118,152 +99,152 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
     }
   }, [user, isLoading, segments]);
 
-  const handleBiometricRetry = async () => {
-    setIsCheckingBiometric(true);
+  const handleRetry = async () => {
+    setIsAuthenticating(true);
+    setBiometricFailed(false);
     const result = await authenticateWithBiometric();
-    
     if (result.success) {
-      setShowBiometricModal(false);
-      setIsCheckingBiometric(false);
+      setBiometricLocked(false);
+      biometricChecked.current = true;
     } else {
-      setIsCheckingBiometric(false);
-      // If failed or cancelled, show logout option
+      setBiometricFailed(true);
     }
+    setIsAuthenticating(false);
   };
 
   const handleLogout = () => {
     logout();
     router.replace('/login');
-    setShowBiometricModal(false);
+    setBiometricLocked(false);
+    setBiometricFailed(false);
     biometricChecked.current = false;
   };
 
-  if (isLoading || isCheckingBiometric) {
+  // Show loading
+  if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#3498db" />
-        <Text style={styles.loadingText}>
-          {isCheckingBiometric ? 'Verifying identity...' : 'Loading...'}
-        </Text>
+      <View style={[styles.lockScreen, { backgroundColor: COLORS.background }]}>
+        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+        <View style={[styles.lockIcon, { backgroundColor: accent + '15' }]}>
+          <Ionicons name="wallet-outline" size={40} color={accent} />
+        </View>
+        <Text style={[styles.lockBrand, { color: COLORS.text }]}>Khaata<Text style={{ color: accent }}>Wise</Text></Text>
       </View>
     );
   }
 
-  return (
-    <>
-      {children}
-      
-      {/* Biometric Authentication Modal */}
-      <Modal
-        visible={showBiometricModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => {}} // Prevent closing by back button
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.biometricModalContainer}>
-            <Text style={styles.biometricModalTitle}>🔐 Authentication Required</Text>
-            <Text style={styles.biometricModalMessage}>
-              Please authenticate to access the app
-            </Text>
-            <View style={styles.biometricModalButtons}>
-              <TouchableOpacity
-                style={[styles.biometricModalButton, styles.retryButton]}
-                onPress={handleBiometricRetry}
-                disabled={isCheckingBiometric}
-              >
-                <Text style={styles.retryButtonText}>
-                  {isCheckingBiometric ? 'Verifying...' : 'Try Again'}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.biometricModalButton, styles.logoutButton]}
-                onPress={handleLogout}
-                disabled={isCheckingBiometric}
-              >
-                <Text style={styles.logoutButtonText}>Logout</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+  // Biometric lock screen - BLOCKS everything
+  if (biometricLocked) {
+    return (
+      <View style={[styles.lockScreen, { backgroundColor: COLORS.background }]}>
+        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+
+        <View style={[styles.lockIcon, { backgroundColor: accent + '15' }]}>
+          <Ionicons name="lock-closed" size={40} color={accent} />
         </View>
-      </Modal>
-    </>
-  );
+
+        <Text style={[styles.lockBrand, { color: COLORS.text }]}>Khaata<Text style={{ color: accent }}>Wise</Text></Text>
+        <Text style={[styles.lockTitle, { color: COLORS.text }]}>App Locked</Text>
+        <Text style={[styles.lockSubtitle, { color: COLORS.textMuted }]}>
+          {isAuthenticating ? 'Verifying your identity...' : biometricFailed ? 'Authentication failed. Try again.' : 'Authenticate to continue'}
+        </Text>
+
+        {biometricFailed && !isAuthenticating && (
+          <View style={styles.lockActions}>
+            <TouchableOpacity style={[styles.lockBtn, { backgroundColor: accent }]} onPress={handleRetry}>
+              <Ionicons name="finger-print-outline" size={22} color="#fff" />
+              <Text style={styles.lockBtnText}>Unlock with Biometric</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.lockBtnOutline, { borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : '#e2e8f0' }]} onPress={handleLogout}>
+              <Ionicons name="log-out-outline" size={20} color="#ef4444" />
+              <Text style={[styles.lockBtnOutlineText, { color: '#ef4444' }]}>Logout</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {isAuthenticating && (
+          <View style={[styles.pulseCircle, { borderColor: accent + '40' }]}>
+            <Ionicons name="finger-print" size={50} color={accent} />
+          </View>
+        )}
+      </View>
+    );
+  }
+
+  return <>{children}</>;
 }
 
 const styles = StyleSheet.create({
-  loadingContainer: {
+  lockScreen: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    paddingHorizontal: 40,
   },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  lockIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    marginBottom: 20,
   },
-  biometricModalContainer: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 24,
-    width: '100%',
-    maxWidth: 400,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  biometricModalTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#2c3e50',
+  lockBrand: {
+    fontSize: 28,
+    fontWeight: '900',
+    letterSpacing: -0.5,
     marginBottom: 12,
-    textAlign: 'center',
   },
-  biometricModalMessage: {
-    fontSize: 16,
-    color: '#7f8c8d',
-    marginBottom: 24,
-    textAlign: 'center',
+  lockTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    marginBottom: 8,
   },
-  biometricModalButtons: {
+  lockSubtitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 32,
+  },
+  lockActions: {
+    width: '100%',
+    gap: 12,
+  },
+  lockBtn: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  biometricModalButton: {
-    flex: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 10,
     alignItems: 'center',
-    marginHorizontal: 6,
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 16,
+    borderRadius: 16,
   },
-  retryButton: {
-    backgroundColor: '#20B2AA',
-  },
-  retryButtonText: {
-    color: 'white',
+  lockBtnText: {
+    color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '800',
   },
-  logoutButton: {
-    backgroundColor: '#e74c3c',
+  lockBtnOutline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 16,
+    borderWidth: 1,
   },
-  logoutButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
+  lockBtnOutlineText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  pulseCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 3,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 20,
   },
 });

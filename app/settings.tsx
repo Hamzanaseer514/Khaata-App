@@ -1,7 +1,9 @@
+import { tapHaptic, heavyHaptic, warningHaptic, successHaptic } from '@/utils/haptics';
 import config from '@/config/config';
 import BottomNav from '@/components/BottomNav';
 import { useTheme } from '@/contexts/DarkModeContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { Image } from 'expo-image';
 import { getBiometricPreference, isBiometricAvailable, setBiometricPreference } from '@/utils/biometric';
 import { showError, showInfo, showSuccess } from '@/utils/toast';
 import { goBack } from '@/utils/navigation';
@@ -20,8 +22,12 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Share,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { useCurrency, CURRENCIES } from '@/contexts/CurrencyContext';
 
 export default function SettingsScreen() {
   const { user, logout, token } = useAuth();
@@ -35,8 +41,11 @@ export default function SettingsScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [currency, setCurrency] = useState('Rs');
-  const [language, setLanguage] = useState('English');
+  const { t } = useTranslation();
+  const { language: currentLang, setLanguage: changeLanguage } = useLanguage();
+  const { currency, setCurrency } = useCurrency();
+  const [showLanguagePicker, setShowLanguagePicker] = useState(false);
+  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
   const [biometricAuth, setBiometricAuth] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
 
@@ -55,6 +64,7 @@ export default function SettingsScreen() {
   };
 
   const handleBiometricToggle = async (value: boolean) => {
+    tapHaptic();
     try {
       if (value) {
         const available = await isBiometricAvailable();
@@ -70,10 +80,11 @@ export default function SettingsScreen() {
   };
 
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const handleLogout = () => { setShowLogoutConfirm(true); };
+  const handleLogout = () => { warningHaptic(); setShowLogoutConfirm(true); };
   const confirmLogout = () => { setShowLogoutConfirm(false); logout(); showSuccess('Logged out'); };
 
   const confirmDeleteAccount = async () => {
+    heavyHaptic();
     if (!token) { showError('Please login again.'); return; }
     setIsDeleting(true);
     try {
@@ -100,7 +111,7 @@ export default function SettingsScreen() {
       const filename = `khaata_backup_${new Date().toISOString().split('T')[0]}.json`;
       const fileUri = `${FileSystem.documentDirectory}${filename}`;
       await FileSystem.writeAsStringAsync(fileUri, json, { encoding: FileSystem.EncodingType.UTF8 });
-      if (await Sharing.isAvailableAsync()) { await Sharing.shareAsync(fileUri, { mimeType: 'application/json' }); showSuccess('Backup created!'); }
+      if (await Sharing.isAvailableAsync()) { await Sharing.shareAsync(fileUri, { mimeType: 'application/json' }); successHaptic(); showSuccess('Backup created!'); }
       else showInfo('Saved to device storage');
     } catch (e) { showError('Failed to backup data'); }
     finally { setIsLoading(false); }
@@ -140,7 +151,7 @@ export default function SettingsScreen() {
         <TouchableOpacity onPress={() => goBack()} hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
           <Ionicons name="chevron-back" size={28} color="#ffffff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Settings</Text>
+        <Text style={styles.headerTitle}>{t('settings.title')}</Text>
         <View style={{ width: 28 }} />
       </View>
 
@@ -149,8 +160,12 @@ export default function SettingsScreen() {
 
           {/* Profile Card */}
           <TouchableOpacity style={[styles.profileCard, { backgroundColor: cardBg, borderColor }]} onPress={() => router.push('/profile')} activeOpacity={0.7}>
-            <View style={[styles.profileAvatar, { backgroundColor: isDarkMode ? 'rgba(34,211,238,0.1)' : 'rgba(10,126,164,0.08)' }]}>
-              <Text style={[styles.profileInitial, { color: accent }]}>{user?.name?.charAt(0)?.toUpperCase() || 'U'}</Text>
+            <View style={[styles.profileAvatar, { backgroundColor: isDarkMode ? 'rgba(34,211,238,0.1)' : 'rgba(10,126,164,0.08)', overflow: 'hidden' }]}>
+              {user?.profilePicture ? (
+                <Image source={{ uri: user.profilePicture }} style={{ width: '100%', height: '100%', borderRadius: 24 }} contentFit="cover" />
+              ) : (
+                <Image source={require('../assets/images/avatar.png')} style={{ width: '100%', height: '100%', borderRadius: 24 }} contentFit="cover" />
+              )}
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.profileName, { color: COLORS.text }]}>{user?.name || 'User'}</Text>
@@ -160,50 +175,62 @@ export default function SettingsScreen() {
           </TouchableOpacity>
 
           {/* Account */}
-          <Text style={[styles.sectionLabel, { color: COLORS.textMuted }]}>ACCOUNT</Text>
+          <Text style={[styles.sectionLabel, { color: COLORS.textMuted }]}>{t('settings.account')}</Text>
           <View style={[styles.group, { backgroundColor: cardBg, borderColor }]}>
-            <Item icon="lock-closed-outline" title="Change Password" subtitle="Update your password" onPress={() => router.push('/change-password')} />
-            <Item icon="download-outline" title="Export Data" subtitle="Download transaction data" onPress={() => showInfo('Coming soon!')} />
-            <Item icon="trash-outline" iconColor="#ef4444" title="Delete Account" subtitle="Permanently delete account" onPress={() => setShowDeleteConfirm(true)} last />
+            <Item icon="lock-closed-outline" title={t('settings.changePassword')} subtitle={t('settings.updatePassword')} onPress={() => router.push('/change-password')} />
+            <Item icon="download-outline" title={t('settings.exportData')} subtitle={t('settings.downloadData')} onPress={() => showInfo(t('common.comingSoon'))} />
+            <Item icon="trash-outline" iconColor="#ef4444" title={t('settings.deleteAccount')} subtitle={t('settings.deleteAccountSub')} onPress={() => setShowDeleteConfirm(true)} last />
           </View>
 
           {/* Preferences */}
-          <Text style={[styles.sectionLabel, { color: COLORS.textMuted }]}>PREFERENCES</Text>
+          <Text style={[styles.sectionLabel, { color: COLORS.textMuted }]}>{t('settings.preferences')}</Text>
           <View style={[styles.group, { backgroundColor: cardBg, borderColor }]}>
-            <Item icon={isDarkMode ? 'sunny-outline' : 'moon-outline'} title="Dark Mode" subtitle={isDarkMode ? 'Light theme' : 'Dark theme'}
+            <Item icon={isDarkMode ? 'sunny-outline' : 'moon-outline'} title={t('settings.darkMode')} subtitle={isDarkMode ? t('settings.lightTheme') : t('settings.darkTheme')}
               right={<ThemeSwitch value={isDarkMode} onChange={(v) => setThemeMode(v ? 'dark' : 'light')} />} />
-            <Item icon="cash-outline" title="Currency" subtitle={currency} onPress={() => showInfo('Coming soon!')} />
-            <Item icon="globe-outline" title="Language" subtitle={language} onPress={() => showInfo('Coming soon!')} last />
+            <Item icon="cash-outline" title={t('settings.currency')} subtitle={`${currency.flag} ${currency.code} (${currency.symbol})`} onPress={() => setShowCurrencyPicker(true)} />
+            <Item icon="globe-outline" title={t('settings.language')} subtitle={currentLang === 'ur' ? 'اردو' : 'English'} onPress={() => setShowLanguagePicker(true)} last />
           </View>
 
           {/* Security */}
-          <Text style={[styles.sectionLabel, { color: COLORS.textMuted }]}>SECURITY</Text>
+          <Text style={[styles.sectionLabel, { color: COLORS.textMuted }]}>{t('settings.security')}</Text>
           <View style={[styles.group, { backgroundColor: cardBg, borderColor }]}>
-            <Item icon="finger-print-outline" title="Biometric Auth" subtitle={biometricAvailable ? 'Fingerprint or Face ID' : 'Not available'}
+            <Item icon="finger-print-outline" title={t('settings.biometricAuth')} subtitle={biometricAvailable ? t('settings.fingerprintFaceId') : t('settings.notAvailable')}
               right={<ThemeSwitch value={biometricAuth} onChange={handleBiometricToggle} disabled={!biometricAvailable} />} last />
           </View>
 
           {/* Data */}
-          <Text style={[styles.sectionLabel, { color: COLORS.textMuted }]}>DATA</Text>
+          <Text style={[styles.sectionLabel, { color: COLORS.textMuted }]}>{t('settings.data')}</Text>
           <View style={[styles.group, { backgroundColor: cardBg, borderColor }]}>
-            <Item icon="cloud-download-outline" title="Backup Data" subtitle={isLoading ? 'Creating backup...' : 'Backup your data'}
+            <Item icon="cloud-download-outline" title={t('settings.backupData')} subtitle={isLoading ? t('settings.creatingBackup') : t('settings.backupYourData')}
               onPress={handleBackupData} right={isLoading ? <ActivityIndicator size="small" color={accent} /> : undefined} />
-            <Item icon="refresh-outline" title="Clear Cache" subtitle="Free up storage" onPress={() => showSuccess('Cache cleared!')} last />
+            <Item icon="refresh-outline" title={t('settings.clearCache')} subtitle={t('settings.freeStorage')} onPress={() => showSuccess(t('settings.cacheCleared'))} last />
           </View>
 
           {/* About */}
-          <Text style={[styles.sectionLabel, { color: COLORS.textMuted }]}>ABOUT</Text>
+          <Text style={[styles.sectionLabel, { color: COLORS.textMuted }]}>{t('settings.about')}</Text>
           <View style={[styles.group, { backgroundColor: cardBg, borderColor }]}>
-            <Item icon="information-circle-outline" title="App Version" subtitle="1.0.0" />
-            <Item icon="shield-checkmark-outline" title="Privacy Policy" onPress={() => router.push('/privacy-policy')} />
-            <Item icon="document-text-outline" title="Terms of Service" onPress={() => router.push('/terms-of-service')} />
-            <Item icon="chatbubble-ellipses-outline" title="Contact Support" onPress={() => router.push('/contact-support')} last />
+            <Item icon="information-circle-outline" title={t('settings.appVersion')} subtitle="1.0.0" />
+            <Item icon="shield-checkmark-outline" title={t('settings.privacyPolicy')} onPress={() => router.push('/privacy-policy')} />
+            <Item icon="document-text-outline" title={t('settings.termsOfService')} onPress={() => router.push('/terms-of-service')} />
+            <Item icon="chatbubble-ellipses-outline" title={t('settings.contactSupport')} onPress={() => router.push('/contact-support')} />
+            <Item icon="star-outline" iconColor="#fbbf24" title="Rate & Feedback" subtitle="Help us improve" onPress={() => router.push('/feedback')} />
+            <Item icon="share-social-outline" iconColor="#22c55e" title="Share KhaataWise" subtitle="Earn 10 coins per share" onPress={async () => {
+              try {
+                const result = await Share.share({ message: 'Try KhaataWise - the smartest way to track money with friends! Download now: https://play.google.com/store/apps/details?id=com.khaata.app', title: 'KhaataWise' });
+                if (result.action === Share.sharedAction && token) {
+                  const res = await fetch(`${config.BASE_URL}/rewards/share`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } });
+                  const data = await res.json();
+                  if (data.success && data.data.pointsAwarded > 0) { successHaptic(); showSuccess(`+${data.data.pointsAwarded} coins earned!`); }
+                  else if (data.success) showSuccess(data.message);
+                }
+              } catch {}
+            }} last />
           </View>
 
           {/* Logout */}
           <TouchableOpacity style={[styles.logoutBtn, { backgroundColor: isDarkMode ? 'rgba(239,68,68,0.1)' : '#fef2f2', borderColor: isDarkMode ? 'rgba(239,68,68,0.2)' : '#fecaca' }]} onPress={handleLogout}>
             <Ionicons name="log-out-outline" size={20} color="#ef4444" />
-            <Text style={styles.logoutText}>Logout</Text>
+            <Text style={styles.logoutText}>{t('settings.logout')}</Text>
           </TouchableOpacity>
 
           <View style={{ height: 120 }} />
@@ -215,19 +242,19 @@ export default function SettingsScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.confirmModal, { backgroundColor: isDarkMode ? '#1e293b' : '#ffffff' }]}>
             <Ionicons name="warning-outline" size={44} color="#ef4444" style={{ alignSelf: 'center', marginBottom: 12 }} />
-            <Text style={[styles.confirmTitle, { color: COLORS.text }]}>Delete Account?</Text>
+            <Text style={[styles.confirmTitle, { color: COLORS.text }]}>{t('settings.deleteAccountConfirm')}</Text>
             <Text style={[styles.confirmDesc, { color: COLORS.textMuted }]}>
-              This will erase all your data, credentials, and khaata. This cannot be undone.
+              {t('settings.deleteAccountMsg')}
             </Text>
             <View style={styles.confirmActions}>
               <TouchableOpacity
                 style={[styles.confirmCancelBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : '#f3f4f6' }]}
                 onPress={() => setShowDeleteConfirm(false)} disabled={isDeleting}
               >
-                <Text style={[styles.confirmCancelText, { color: COLORS.text }]}>Cancel</Text>
+                <Text style={[styles.confirmCancelText, { color: COLORS.text }]}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.confirmDeleteBtn} onPress={confirmDeleteAccount} disabled={isDeleting}>
-                <Text style={styles.confirmDeleteText}>{isDeleting ? 'Deleting...' : 'Delete'}</Text>
+                <Text style={styles.confirmDeleteText}>{isDeleting ? t('settings.deletingAccount') : t('common.delete')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -239,24 +266,98 @@ export default function SettingsScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.confirmModal, { backgroundColor: isDarkMode ? '#1e293b' : '#ffffff' }]}>
             <Ionicons name="log-out-outline" size={44} color={accent} style={{ alignSelf: 'center', marginBottom: 12 }} />
-            <Text style={[styles.confirmTitle, { color: COLORS.text }]}>Logout?</Text>
+            <Text style={[styles.confirmTitle, { color: COLORS.text }]}>{t('settings.logoutConfirm')}</Text>
             <Text style={[styles.confirmDesc, { color: COLORS.textMuted }]}>
-              Are you sure you want to end your session?
+              {t('settings.logoutMsg')}
             </Text>
             <View style={styles.confirmActions}>
               <TouchableOpacity
                 style={[styles.confirmCancelBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : '#f3f4f6' }]}
                 onPress={() => setShowLogoutConfirm(false)}
               >
-                <Text style={[styles.confirmCancelText, { color: COLORS.text }]}>Cancel</Text>
+                <Text style={[styles.confirmCancelText, { color: COLORS.text }]}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.confirmDeleteBtn} onPress={confirmLogout}>
-                <Text style={styles.confirmDeleteText}>Yes, Logout</Text>
+                <Text style={styles.confirmDeleteText}>{t('settings.yesLogout')}</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       )}
+      {/* Language Picker */}
+      {showLanguagePicker && (
+        <View style={styles.modalOverlay}>
+          <View style={[styles.confirmModal, { backgroundColor: isDarkMode ? '#1e293b' : '#ffffff' }]}>
+            <Ionicons name="globe-outline" size={44} color={accent} style={{ alignSelf: 'center', marginBottom: 12 }} />
+            <Text style={[styles.confirmTitle, { color: COLORS.text }]}>{t('settings.selectLanguage')}</Text>
+            <View style={{ gap: 10, marginTop: 16 }}>
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 12, borderWidth: 2, borderColor: currentLang === 'en' ? accent : borderColor, backgroundColor: currentLang === 'en' ? accent + '15' : 'transparent' }}
+                onPress={() => { changeLanguage('en'); setShowLanguagePicker(false); }}
+              >
+                <Text style={{ fontSize: 20, marginRight: 12 }}>🇺🇸</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 16, fontWeight: '800', color: COLORS.text }}>English</Text>
+                  <Text style={{ fontSize: 12, color: COLORS.textMuted }}>Default language</Text>
+                </View>
+                {currentLang === 'en' && <Ionicons name="checkmark-circle" size={22} color={accent} />}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 12, borderWidth: 2, borderColor: currentLang === 'ur' ? accent : borderColor, backgroundColor: currentLang === 'ur' ? accent + '15' : 'transparent' }}
+                onPress={() => { changeLanguage('ur'); setShowLanguagePicker(false); }}
+              >
+                <Text style={{ fontSize: 20, marginRight: 12 }}>🇵🇰</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 16, fontWeight: '800', color: COLORS.text }}>اردو</Text>
+                  <Text style={{ fontSize: 12, color: COLORS.textMuted }}>Urdu</Text>
+                </View>
+                {currentLang === 'ur' && <Ionicons name="checkmark-circle" size={22} color={accent} />}
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              style={{ marginTop: 16, paddingVertical: 12, borderRadius: 12, alignItems: 'center', backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : '#f3f4f6' }}
+              onPress={() => setShowLanguagePicker(false)}
+            >
+              <Text style={{ color: COLORS.text, fontSize: 15, fontWeight: '600' }}>{t('common.cancel')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* Currency Picker */}
+      {showCurrencyPicker && (
+        <View style={styles.modalOverlay}>
+          <View style={[styles.confirmModal, { backgroundColor: isDarkMode ? '#1e293b' : '#ffffff', maxHeight: '70%' }]}>
+            <Ionicons name="cash-outline" size={44} color={accent} style={{ alignSelf: 'center', marginBottom: 12 }} />
+            <Text style={[styles.confirmTitle, { color: COLORS.text }]}>{t('settings.currency')}</Text>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 12, maxHeight: 350 }}>
+              <View style={{ gap: 6 }}>
+                {CURRENCIES.map(c => (
+                  <TouchableOpacity
+                    key={c.code}
+                    style={{ flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12, borderWidth: 2, borderColor: currency.code === c.code ? accent : borderColor, backgroundColor: currency.code === c.code ? accent + '15' : 'transparent' }}
+                    onPress={() => { setCurrency(c); setShowCurrencyPicker(false); }}
+                  >
+                    <Text style={{ fontSize: 20, marginRight: 12 }}>{c.flag}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 15, fontWeight: '700', color: COLORS.text }}>{c.symbol} — {c.code}</Text>
+                      <Text style={{ fontSize: 11, color: COLORS.textMuted }}>{c.name}</Text>
+                    </View>
+                    {currency.code === c.code && <Ionicons name="checkmark-circle" size={22} color={accent} />}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+            <TouchableOpacity
+              style={{ marginTop: 14, paddingVertical: 12, borderRadius: 12, alignItems: 'center', backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : '#f3f4f6' }}
+              onPress={() => setShowCurrencyPicker(false)}
+            >
+              <Text style={{ color: COLORS.text, fontSize: 15, fontWeight: '600' }}>{t('common.cancel')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
       <BottomNav />
     </View>
   );

@@ -2,8 +2,11 @@ import BottomNav from '@/components/BottomNav';
 import config from '@/config/config';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/DarkModeContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { showError, showSuccess } from '@/utils/toast';
+import { tapHaptic, successHaptic, heavyHaptic } from '@/utils/haptics';
 import { goBack } from '@/utils/navigation';
+import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -47,6 +50,8 @@ interface MessRecord {
 export default function MessScreen() {
   const { user, token } = useAuth();
   const { isDarkMode } = useTheme();
+  const { t } = useTranslation();
+  const { currency: cur } = useCurrency();
   const COLORS = isDarkMode ? config.DARK_COLORS : config.LIGHT_COLORS;
   const accent = isDarkMode ? '#22d3ee' : '#0a7ea4';
 
@@ -122,6 +127,7 @@ export default function MessScreen() {
       const data = await response.json();
       if (!response.ok) { showError(data.message || `Error: ${response.status}`); return; }
       if (data.success) {
+        successHaptic();
         showSuccess('Record added!');
         setPrice(''); setPersonCount('1'); setSelectedDate(new Date()); setMealType('Breakfast');
         setShowAddModal(false); loadRecords();
@@ -143,7 +149,7 @@ export default function MessScreen() {
       });
       if (!response.ok) throw new Error(`Error: ${response.status}`);
       const data = await response.json();
-      if (data.success) { showSuccess('Deleted!'); loadRecords(); }
+      if (data.success) { heavyHaptic(); showSuccess('Deleted!'); loadRecords(); }
       else showError(data.message || 'Failed');
     } catch (error) { console.error('Error:', error); showError('Failed to delete.'); }
     finally { setShowDeleteConfirm(false); setRecordToDelete(null); }
@@ -174,6 +180,7 @@ export default function MessScreen() {
       const data = await response.json();
       if (!response.ok) { showError(data.message || `Error: ${response.status}`); return; }
       if (data.success) {
+        successHaptic();
         showSuccess('Record updated!');
         setShowEditModal(false); setEditingRecord(null);
         setPrice(''); setPersonCount('1'); setSelectedDate(new Date()); setMealType('Breakfast');
@@ -191,8 +198,13 @@ export default function MessScreen() {
 
   // Summary for current filter
   const totalSpent = filteredRecords.reduce((s, r) => s + r.price, 0);
-  const mealCounts = { Breakfast: 0, Lunch: 0, Dinner: 0 };
-  filteredRecords.forEach(r => { mealCounts[r.mealType]++; });
+  const totalMeals = filteredRecords.length;
+  const mealCounts = { Breakfast: 0, Lunch: 0, Dinner: 0 } as Record<string, number>;
+  filteredRecords.forEach(r => {
+    const key = r.mealType?.charAt(0).toUpperCase() + r.mealType?.slice(1).toLowerCase();
+    if (mealCounts[key] !== undefined) mealCounts[key]++;
+    else mealCounts[r.mealType] = (mealCounts[r.mealType] || 0) + 1;
+  });
 
   // Years from data
   const currentYear = new Date().getFullYear();
@@ -222,13 +234,13 @@ export default function MessScreen() {
         </View>
         {/* Info */}
         <View style={styles.recordInfo}>
-          <Text style={[styles.recordMealType, { color: COLORS.text }]}>{item.mealType}</Text>
+          <Text style={[styles.recordMealType, { color: COLORS.text }]}>{t(`mess.${item.mealType.toLowerCase()}`)}</Text>
           <Text style={[styles.recordDate, { color: COLORS.textMuted }]}>
             {formatDate(item.date)}{persons > 1 ? ` · ${persons} persons` : ''}
           </Text>
         </View>
         {/* Price */}
-        <Text style={[styles.recordPrice, { color: accent }]}>Rs {Math.round(item.price)}</Text>
+        <Text style={[styles.recordPrice, { color: accent }]}>{cur.symbol} {Math.round(item.price)}</Text>
         {/* Edit + Delete icons (like contacts) */}
         <View style={styles.compactActions}>
           <TouchableOpacity style={styles.smallIconBtn} onPress={() => handleEditPress(item)} activeOpacity={0.6}>
@@ -264,7 +276,7 @@ export default function MessScreen() {
         <TouchableOpacity onPress={() => goBack()} hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
           <Ionicons name="chevron-back" size={28} color="#ffffff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Mess Attendance</Text>
+        <Text style={styles.headerTitle}>{t('mess.title')}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <TouchableOpacity
             style={[styles.headerIconBtn, { backgroundColor: 'rgba(255,255,255,0.2)' }]}
@@ -290,7 +302,7 @@ export default function MessScreen() {
             {monthNames[selectedMonth - 1]} {selectedYear}
           </Text>
           <Text style={[styles.dateBarSub, { color: COLORS.textMuted }]}>
-            {filteredRecords.length} record{filteredRecords.length !== 1 ? 's' : ''} · Rs {Math.round(totalSpent).toLocaleString()}
+            {filteredRecords.length} record{filteredRecords.length !== 1 ? 's' : ''} · {cur.symbol} {Math.round(totalSpent).toLocaleString()}
           </Text>
         </View>
         <TouchableOpacity
@@ -342,11 +354,11 @@ export default function MessScreen() {
       </Animated.View>
 
       {/* Year/Month Dropdown Modals */}
-      <DropdownModal visible={showYearDropdown} onClose={() => setShowYearDropdown(false)} title="Select Year"
+      <DropdownModal visible={showYearDropdown} onClose={() => setShowYearDropdown(false)} title={t('mess.selectYear')}
         items={yearList.map(y => ({ label: String(y), value: y }))} selected={selectedYear}
         onSelect={(v) => { setSelectedYear(v as number); setShowYearDropdown(false); }}
         isDarkMode={isDarkMode} COLORS={COLORS} accent={accent} />
-      <DropdownModal visible={showMonthDropdown} onClose={() => setShowMonthDropdown(false)} title="Select Month"
+      <DropdownModal visible={showMonthDropdown} onClose={() => setShowMonthDropdown(false)} title={t('mess.selectMonth')}
         items={allMonths} selected={selectedMonth}
         onSelect={(v) => { setSelectedMonth(v as number); setShowMonthDropdown(false); }}
         isDarkMode={isDarkMode} COLORS={COLORS} accent={accent} />
@@ -362,6 +374,23 @@ export default function MessScreen() {
             <Text style={[styles.mealChipText, { color: m.color }]}>{mealCounts[m.value]}</Text>
           </View>
         ))}
+        {/* Total meals */}
+        <View style={[styles.mealChip, {
+          backgroundColor: isDarkMode ? 'rgba(255,255,255,0.04)' : '#f1f5f9',
+          borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#e2e8f0',
+        }]}>
+          <Ionicons name="stats-chart-outline" size={14} color={accent} />
+          <Text style={[styles.mealChipText, { color: accent }]}>{totalMeals}</Text>
+        </View>
+        {/* Avg cost */}
+        {totalMeals > 0 && (
+          <View style={[styles.mealChip, {
+            backgroundColor: isDarkMode ? 'rgba(255,255,255,0.04)' : '#f1f5f9',
+            borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#e2e8f0',
+          }]}>
+            <Text style={[styles.mealChipText, { color: COLORS.textMuted, fontSize: 10 }]}>avg {cur.symbol} {Math.round(totalSpent / totalMeals)}</Text>
+          </View>
+        )}
       </View>
 
       {/* Records List */}
@@ -370,7 +399,7 @@ export default function MessScreen() {
           <View style={[styles.emptyIconWrap, { backgroundColor: isDarkMode ? 'rgba(34, 211, 238, 0.05)' : 'rgba(10, 126, 164, 0.05)' }]}>
             <Ionicons name="restaurant-outline" size={70} color={isDarkMode ? 'rgba(34, 211, 238, 0.2)' : 'rgba(10, 126, 164, 0.2)'} />
           </View>
-          <Text style={[styles.emptyTitle, { color: COLORS.text }]}>No Records</Text>
+          <Text style={[styles.emptyTitle, { color: COLORS.text }]}>{t('mess.noRecords')}</Text>
           <Text style={[styles.emptyDesc, { color: COLORS.textMuted }]}>
             {records.length === 0 ? 'Add your first meal record' : `No records for ${monthNames[selectedMonth - 1]} ${selectedYear}`}
           </Text>
@@ -404,7 +433,7 @@ export default function MessScreen() {
           showDatePicker={showDatePicker} setShowDatePicker={setShowDatePicker}
           isSubmitting={isSubmitting} onClose={() => setShowAddModal(false)} onSubmit={handleAddRecord}
           isDarkMode={isDarkMode} COLORS={COLORS} accent={accent}
-          title="Add Record"
+          title={t('mess.addRecord')}
         />
       )}
 
@@ -420,7 +449,8 @@ export default function MessScreen() {
           onClose={() => { setShowEditModal(false); setEditingRecord(null); setPrice(''); setPersonCount('1'); setSelectedDate(new Date()); setMealType('Breakfast'); }}
           onSubmit={handleEditSubmit}
           isDarkMode={isDarkMode} COLORS={COLORS} accent={accent}
-          title="Edit Record"
+          title={t('mess.editRecord')}
+          isEdit={true}
         />
       )}
 
@@ -429,17 +459,17 @@ export default function MessScreen() {
         <View style={styles.confirmOverlay}>
           <View style={[styles.confirmModal, { backgroundColor: isDarkMode ? '#1e293b' : '#ffffff' }]}>
             <Ionicons name="warning-outline" size={40} color="#ef4444" style={{ alignSelf: 'center', marginBottom: 12 }} />
-            <Text style={[styles.confirmTitle, { color: COLORS.text }]}>Delete record?</Text>
+            <Text style={[styles.confirmTitle, { color: COLORS.text }]}>{t('mess.deleteRecord')}</Text>
             <Text style={[styles.confirmDesc, { color: COLORS.textMuted }]}>This action cannot be undone.</Text>
             <View style={styles.confirmActions}>
               <TouchableOpacity
                 style={[styles.confirmCancelBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : '#f3f4f6' }]}
                 onPress={() => { setShowDeleteConfirm(false); setRecordToDelete(null); }}
               >
-                <Text style={[styles.confirmCancelText, { color: COLORS.text }]}>Cancel</Text>
+                <Text style={[styles.confirmCancelText, { color: COLORS.text }]}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.confirmDeleteBtn} onPress={confirmDelete}>
-                <Text style={styles.confirmDeleteText}>Delete</Text>
+                <Text style={styles.confirmDeleteText}>{t('common.delete')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -481,7 +511,9 @@ function DropdownModal({ visible, onClose, title, items, selected, onSelect, isD
 }
 
 // Add Record Modal
-function AddRecordModal({ selectedDate, setSelectedDate, mealType, setMealType, price, setPrice, personCount, setPersonCount, showDatePicker, setShowDatePicker, isSubmitting, onClose, onSubmit, isDarkMode, COLORS, accent, title = 'Add Record' }: any) {
+function AddRecordModal({ selectedDate, setSelectedDate, mealType, setMealType, price, setPrice, personCount, setPersonCount, showDatePicker, setShowDatePicker, isSubmitting, onClose, onSubmit, isDarkMode, COLORS, accent, title, isEdit = false }: any) {
+  const { currency: cur } = useCurrency();
+  const { t } = useTranslation();
   const cardBg = isDarkMode ? COLORS.surface : '#ffffff';
   const inputBg = isDarkMode ? COLORS.background : '#f8fafc';
   const borderColor = isDarkMode ? 'rgba(255,255,255,0.05)' : '#e2e8f0';
@@ -510,7 +542,7 @@ function AddRecordModal({ selectedDate, setSelectedDate, mealType, setMealType, 
             <View style={styles.formBody}>
               {/* Big Price Input */}
               <View style={styles.bigAmountRow}>
-                <Text style={[styles.bigCurrency, { color: COLORS.primary }]}>Rs</Text>
+                <Text style={[styles.bigCurrency, { color: COLORS.primary }]}>{cur.symbol}</Text>
                 <TextInput
                   style={[styles.bigAmountInput, { color: COLORS.text }]}
                   placeholder="0" placeholderTextColor={COLORS.textMuted}
@@ -530,7 +562,7 @@ function AddRecordModal({ selectedDate, setSelectedDate, mealType, setMealType, 
                     onPress={() => setMealType(m.value)}
                   >
                     <Ionicons name={m.icon} size={22} color={mealType === m.value ? m.color : COLORS.textMuted} />
-                    <Text style={[styles.mealToggleText, { color: mealType === m.value ? m.color : COLORS.textMuted }]}>{m.label}</Text>
+                    <Text style={[styles.mealToggleText, { color: mealType === m.value ? m.color : COLORS.textMuted }]}>{t(`mess.${m.value.toLowerCase()}`)}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -559,7 +591,7 @@ function AddRecordModal({ selectedDate, setSelectedDate, mealType, setMealType, 
               >
                 {isSubmitting ? <ActivityIndicator color="#fff" /> : (
                   <>
-                    <Text style={styles.saveButtonText}>{title === 'Edit Record' ? 'Update Record' : 'Save Record'}</Text>
+                    <Text style={styles.saveButtonText}>{isEdit ? t('mess.updateRecord') : t('mess.saveRecord')}</Text>
                     <Ionicons name="checkmark-circle" size={20} color="#fff" style={{ marginLeft: 8 }} />
                   </>
                 )}

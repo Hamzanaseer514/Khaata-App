@@ -3,25 +3,29 @@ import { StyleSheet, Text, TouchableOpacity, View, Platform } from 'react-native
 import { Ionicons } from '@expo/vector-icons';
 import { router, usePathname } from 'expo-router';
 import { useTheme } from '@/contexts/DarkModeContext';
+import { tapHaptic } from '@/utils/haptics';
 import config from '@/config/config';
+import { useTranslation } from 'react-i18next';
 
 const { LIGHT_COLORS, DARK_COLORS } = config;
 
-const NAV_ITEMS = [
-  { icon: 'settings-outline', activeIcon: 'settings', label: 'Settings', path: '/settings' },
-  { icon: 'people-outline', activeIcon: 'people', label: 'Contacts', path: '/contacts' },
-  { icon: 'home-outline', activeIcon: 'home', label: 'Home', path: '/dashboard', isCenter: true },
-  { icon: 'restaurant-outline', activeIcon: 'restaurant', label: 'Mess', path: '/mess' },
-  { icon: 'wallet-outline', activeIcon: 'wallet', label: 'Khaata', path: '/personal-khaata' },
-];
-
 function BottomNav() {
+  const { t } = useTranslation();
+
+  const NAV_ITEMS = [
+    { icon: 'settings-outline', activeIcon: 'settings', label: t('nav.settings'), path: '/settings' },
+    { icon: 'people-outline', activeIcon: 'people', label: t('nav.contacts'), path: '/contacts' },
+    { icon: 'home-outline', activeIcon: 'home', label: t('nav.home'), path: '/dashboard', isCenter: true },
+    { icon: 'restaurant-outline', activeIcon: 'restaurant', label: t('nav.mess'), path: '/mess' },
+    { icon: 'wallet-outline', activeIcon: 'wallet', label: t('nav.khaata'), path: '/personal-khaata' },
+  ];
   const { isDarkMode } = useTheme();
   const COLORS = isDarkMode ? DARK_COLORS : LIGHT_COLORS;
   const pathname = usePathname();
   const activeColor = isDarkMode ? COLORS.primary : '#0a7ea4';
 
   const navigate = useCallback((path: string) => {
+    tapHaptic();
     if (pathname === path) return; // already on this page
     router.replace(path as any);
   }, [pathname]);

@@ -36,6 +36,51 @@ const userSchema = new mongoose.Schema({
     enum: ['Silver', 'Gold', 'Platinum'],
     default: 'Silver'
   },
+  profilePicture: {
+    type: String,
+    default: null
+  },
+  visitingCard: {
+    type: {
+      cardData: {
+        name: String,
+        title: String,
+        phone: String,
+        email: String,
+        address: String,
+        company: String,
+        website: String,
+      },
+      templateId: String,
+      customDesign: {
+        bgColor: String,
+        accentColor: String,
+        textColor: String,
+        subtextColor: String,
+        layout: String,
+        circleStyle: String,
+        showLogo: Boolean,
+        borderWidth: Number,
+        borderColor: String,
+        borderRadius: Number,
+        elements: [{
+          id: String,
+          content: String,
+          x: Number,
+          y: Number,
+          fontSize: Number,
+          fontWeight: String,
+          color: String,
+          textAlign: String,
+          letterSpacing: Number,
+          textTransform: String,
+          fontId: String,
+        }],
+      },
+      isCustom: Boolean,
+    },
+    default: null,
+  },
   dailyTransactionCount: {
     count: { type: Number, default: 0 },
     lastReset: { type: Date, default: Date.now }

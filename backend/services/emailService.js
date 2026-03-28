@@ -19,176 +19,137 @@ const createTransporter = () => {
 
 // Email templates
 const getEmailTemplate = (transactionData) => {
-  const { type, amount, contactName, updatedBalance, description, userName } = transactionData;
-  
-  // Determine transaction flow based on payer
-  const isUserPaid = type === 'DEBIT'; // USER paid = DEBIT for friend
-  const isFriendPaid = type === 'CREDIT'; // FRIEND paid = CREDIT for friend
-  
-  let transactionMessage = '';
-  let balanceMessage = '';
-  let actionMessage = '';
-  
+  const { type, amount, contactName, updatedBalance, description, userName, visitingCard } = transactionData;
+
+  const isUserPaid = type === 'DEBIT';
+  const amt = Math.round(Number(amount));
+  const bal = Math.round(Math.abs(Number(updatedBalance)));
+  const year = new Date().getFullYear();
+  const date = new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+  const time = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+  let txnLine = '';
+  let statusLine = '';
+
   if (isUserPaid) {
-    // User paid, friend owes user
-    transactionMessage = `You owe Rs ${amount} to ${userName}`;
-    balanceMessage = `Your updated balance: Rs ${updatedBalance}`;
-    actionMessage = updatedBalance > 0 
-      ? `You still owe Rs ${updatedBalance} to ${userName}`
+    txnLine = `${userName} paid — you owe Rs ${amt.toLocaleString()}`;
+    statusLine = updatedBalance > 0
+      ? `You owe Rs ${bal.toLocaleString()} to ${userName}`
       : updatedBalance < 0
-      ? `You have overpaid Rs ${Math.abs(updatedBalance)} to ${userName}`
-      : `Your account with ${userName} is settled`;
-  } else if (isFriendPaid) {
-    // Friend paid, user owes friend
-    transactionMessage = `You paid Rs ${amount} to ${userName}`;
-    balanceMessage = `Your updated balance: Rs ${updatedBalance}`;
-    actionMessage = updatedBalance < 0 
-      ? `${userName} owes you Rs ${Math.abs(updatedBalance)}`
+      ? `Overpaid by Rs ${bal.toLocaleString()}`
+      : `Settled`;
+  } else {
+    txnLine = `You paid Rs ${amt.toLocaleString()} to ${userName}`;
+    statusLine = updatedBalance < 0
+      ? `${userName} owes you Rs ${bal.toLocaleString()}`
       : updatedBalance > 0
-      ? `You still owe Rs ${updatedBalance} to ${userName}`
-      : `Your account with ${userName} is settled`;
+      ? `You owe Rs ${bal.toLocaleString()} to ${userName}`
+      : `Settled`;
   }
-  
+
+  // Visiting card block
+  let cardBlock = '';
+  if (visitingCard && visitingCard.cardData) {
+    const c = visitingCard.cardData;
+    const initials = (c.name || 'KW').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+    const infoRows = [
+      c.phone ? `<tr><td style="padding:3px 0;color:#94a3b8;font-size:12px;">&#9742; ${c.phone}</td></tr>` : '',
+      c.email ? `<tr><td style="padding:3px 0;color:#94a3b8;font-size:12px;">&#9993; ${c.email}</td></tr>` : '',
+      c.website ? `<tr><td style="padding:3px 0;color:#94a3b8;font-size:12px;">&#127760; ${c.website}</td></tr>` : '',
+      c.address ? `<tr><td style="padding:3px 0;color:#94a3b8;font-size:12px;">&#128205; ${c.address}</td></tr>` : '',
+    ].filter(Boolean).join('');
+
+    cardBlock = `
+<tr><td style="padding:0 32px 32px;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;border-radius:8px;">
+    <tr><td style="padding:20px;">
+      <table cellpadding="0" cellspacing="0">
+        <tr>
+          <td width="40" height="40" style="background:#0ea5e9;border-radius:20px;text-align:center;vertical-align:middle;color:#fff;font-size:15px;font-weight:800;">${initials}</td>
+          <td style="padding-left:12px;vertical-align:middle;">
+            <span style="display:block;color:#f1f5f9;font-size:15px;font-weight:700;">${c.name || userName}</span>
+            ${c.title ? `<span style="display:block;color:#38bdf8;font-size:11px;margin-top:1px;">${c.title}</span>` : ''}
+            ${c.company ? `<span style="display:block;color:#64748b;font-size:10px;margin-top:1px;">${c.company}</span>` : ''}
+          </td>
+        </tr>
+      </table>
+      ${infoRows ? `<table cellpadding="0" cellspacing="0" style="margin-top:12px;border-top:1px solid #1e293b;padding-top:10px;">${infoRows}</table>` : ''}
+    </td></tr>
+  </table>
+</td></tr>`;
+  }
+
+  const html = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;-webkit-font-smoothing:antialiased;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;"><tr><td align="center" style="padding:32px 16px;">
+<table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;">
+
+<!-- Logo -->
+<tr><td align="center" style="padding:0 0 24px;">
+  <span style="font-family:'Helvetica Neue',Arial,sans-serif;font-size:22px;font-weight:800;color:#0f172a;letter-spacing:-0.5px;">Khaata</span><span style="font-family:'Helvetica Neue',Arial,sans-serif;font-size:22px;font-weight:800;color:#0ea5e9;letter-spacing:-0.5px;">Wise</span>
+</td></tr>
+
+<!-- Card -->
+<tr><td>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0;">
+
+  <!-- Banner -->
+  <tr><td style="background:${isUserPaid ? '#dc2626' : '#16a34a'};padding:24px 32px;text-align:center;">
+    <p style="margin:0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:11px;font-weight:700;color:rgba(255,255,255,0.85);letter-spacing:2px;text-transform:uppercase;">${isUserPaid ? 'Amount Owed' : 'Payment Received'}</p>
+    <p style="margin:8px 0 0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:32px;font-weight:800;color:#ffffff;">Rs ${amt.toLocaleString()}</p>
+    <p style="margin:6px 0 0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:12px;color:rgba(255,255,255,0.7);">${date} &middot; ${time}</p>
+  </td></tr>
+
+  <!-- Greeting -->
+  <tr><td style="padding:28px 32px 0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:14px;color:#334155;line-height:22px;">
+    Hi <strong style="color:#0f172a;">${contactName}</strong>,<br>A transaction has been recorded by <strong style="color:#0f172a;">${userName}</strong>.
+  </td></tr>
+
+  <!-- Details Table -->
+  <tr><td style="padding:20px 32px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">
+      <tr>
+        <td style="padding:12px 16px;font-family:'Helvetica Neue',Arial,sans-serif;font-size:12px;color:#64748b;border-bottom:1px solid #e2e8f0;">Transaction</td>
+        <td style="padding:12px 16px;font-family:'Helvetica Neue',Arial,sans-serif;font-size:12px;color:#0f172a;font-weight:700;text-align:right;border-bottom:1px solid #e2e8f0;">${txnLine}</td>
+      </tr>
+      <tr>
+        <td style="padding:12px 16px;font-family:'Helvetica Neue',Arial,sans-serif;font-size:12px;color:#64748b;border-bottom:1px solid #e2e8f0;">Description</td>
+        <td style="padding:12px 16px;font-family:'Helvetica Neue',Arial,sans-serif;font-size:12px;color:#0f172a;font-weight:700;text-align:right;border-bottom:1px solid #e2e8f0;">${description || 'No description'}</td>
+      </tr>
+      <tr>
+        <td style="padding:12px 16px;font-family:'Helvetica Neue',Arial,sans-serif;font-size:12px;color:#64748b;">Balance</td>
+        <td style="padding:12px 16px;font-family:'Helvetica Neue',Arial,sans-serif;font-size:14px;font-weight:800;text-align:right;color:${updatedBalance > 0 ? '#dc2626' : updatedBalance < 0 ? '#16a34a' : '#0f172a'};">Rs ${bal.toLocaleString()}</td>
+      </tr>
+    </table>
+  </td></tr>
+
+  <!-- Status -->
+  <tr><td style="padding:0 32px 24px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:${isUserPaid ? '#fef2f2' : '#f0fdf4'};border:1px solid ${isUserPaid ? '#fecaca' : '#bbf7d0'};border-radius:8px;">
+      <tr><td style="padding:12px 16px;font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px;font-weight:700;color:${isUserPaid ? '#dc2626' : '#16a34a'};">${statusLine}</td></tr>
+    </table>
+  </td></tr>
+
+  ${cardBlock}
+
+</table>
+</td></tr>
+
+<!-- Footer -->
+<tr><td align="center" style="padding:24px 0 0;">
+  <p style="margin:0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:11px;color:#94a3b8;line-height:18px;">This is an automated notification from KhaataWise.</p>
+  <p style="margin:8px 0 0;font-family:'Helvetica Neue',Arial,sans-serif;font-size:10px;color:#cbd5e1;">&copy; ${year} KhaataWise. All rights reserved.</p>
+</td></tr>
+
+</table>
+</td></tr></table>
+</body></html>`;
+
   return {
-    subject: `Khaata Transaction - ${isUserPaid ? 'Amount Owed' : 'Payment Received'}`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Khaata Transaction Notification</title>
-        <style>
-          body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f8f9fa;
-          }
-          .container {
-            background-color: white;
-            border-radius: 10px;
-            padding: 30px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-          }
-          .header {
-            text-align: center;
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 2px solid #20B2AA;
-          }
-          .logo {
-            font-size: 24px;
-            font-weight: bold;
-            color: #20B2AA;
-            margin-bottom: 10px;
-          }
-          .transaction-card {
-            background-color: #f8f9fa;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 20px 0;
-            border-left: 4px solid ${isUserPaid ? '#e74c3c' : '#27ae60'};
-          }
-          .amount {
-            font-size: 24px;
-            font-weight: bold;
-            color: ${isUserPaid ? '#e74c3c' : '#27ae60'};
-            margin: 10px 0;
-          }
-          .balance {
-            font-size: 18px;
-            color: #2c3e50;
-            margin: 10px 0;
-          }
-          .action {
-            background-color: ${isUserPaid ? '#fdf2f2' : '#f0f9f0'};
-            border: 1px solid ${isUserPaid ? '#fecaca' : '#bbf7d0'};
-            border-radius: 8px;
-            padding: 15px;
-            margin: 15px 0;
-          }
-          .footer {
-            text-align: center;
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #e0e0e0;
-            color: #7f8c8d;
-            font-size: 14px;
-          }
-          .button {
-            display: inline-block;
-            background-color: #20B2AA;
-            color: white;
-            padding: 12px 24px;
-            text-decoration: none;
-            border-radius: 6px;
-            margin: 20px 0;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <div class="logo">💰 Khaata</div>
-            <h2>Transaction Notification</h2>
-          </div>
-          
-          <p>Hello <strong>${contactName}</strong>,</p>
-          
-          <p>A new transaction has been recorded in your Khaata account:</p>
-          
-          <div class="transaction-card">
-            <h3>Transaction Details</h3>
-            <p><strong>Amount:</strong> <span class="amount">Rs ${amount}</span></p>
-            <p><strong>Description:</strong> ${description || 'No description provided'}</p>
-            <p><strong>Transaction:</strong> ${transactionMessage}</p>
-            <p><strong>${balanceMessage}</strong></p>
-          </div>
-          
-          <div class="action">
-            <h4>📋 Account Status:</h4>
-            <p><strong>${actionMessage}</strong></p>
-          </div>
-          
-          <p>This transaction was automatically recorded in your Khaata account. You can view all your transactions and manage your finances through the Khaata app.</p>
-          
-          <div style="text-align: center;">
-            <a href="#" class="button">View in Khaata App</a>
-          </div>
-          
-          <div class="footer">
-            <p>This is an automated notification from Khaata.</p>
-            <p>If you have any questions, please contact us.</p>
-            <p>© 2024 Khaata. All rights reserved.</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `,
-    text: `
-      Khaata Transaction Notification
-      
-      Hello ${contactName},
-      
-      A new transaction has been recorded in your Khaata account:
-      
-      Amount: Rs ${amount}
-      Description: ${description || 'No description provided'}
-      Transaction: ${transactionMessage}
-      ${balanceMessage}
-      
-      Account Status:
-      ${actionMessage}
-      
-      This transaction was automatically recorded in your Khaata account.
-      
-      Best regards,
-      Khaata Team
-    `
+    subject: `KhaataWise — Rs ${amt.toLocaleString()} ${isUserPaid ? 'Owed' : 'Received'}`,
+    html,
+    text: `KhaataWise\n\nHi ${contactName},\n\n${txnLine}\nDescription: ${description || 'No description'}\nBalance: Rs ${bal.toLocaleString()}\nStatus: ${statusLine}\n\n${visitingCard?.cardData?.name ? '— ' + visitingCard.cardData.name + (visitingCard.cardData.title ? ', ' + visitingCard.cardData.title : '') + (visitingCard.cardData.phone ? ' | ' + visitingCard.cardData.phone : '') : '— ' + userName}\n\nKhaataWise`
   };
 };
 

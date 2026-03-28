@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
+    "cloudinary": "^2.9.0",
     "cors": "^2.8.5",
     "csv-writer": "^1.6.0",
     "dotenv": "^16.6.1",
@@ -16,6 +17,7 @@
     "express-validator": "^7.2.1",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.0.3",
+    "multer": "^2.1.1",
     "nodemailer": "^7.0.6",
     "pdfkit": "^0.17.2"
   },

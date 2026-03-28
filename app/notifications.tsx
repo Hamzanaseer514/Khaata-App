@@ -1,8 +1,10 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/DarkModeContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { showError } from '@/utils/toast';
 import { router, useFocusEffect } from 'expo-router';
 import { goBack } from '@/utils/navigation';
+import { useTranslation } from 'react-i18next';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -38,6 +40,8 @@ interface Notification {
 export default function NotificationsScreen() {
   const { token } = useAuth();
   const { isDarkMode } = useTheme();
+  const { t } = useTranslation();
+  const { currency: cur } = useCurrency();
   const COLORS = isDarkMode ? config.DARK_COLORS : config.LIGHT_COLORS;
   const accent = isDarkMode ? '#22d3ee' : '#0a7ea4';
   const cardBg = isDarkMode ? 'rgba(30, 41, 59, 0.5)' : '#ffffff';
@@ -107,18 +111,18 @@ export default function NotificationsScreen() {
         {item.transactionDetails && (
           <View style={[styles.txDetails, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.03)' : '#f8fafc', borderColor }]}>
             <View style={styles.txRow}>
-              <Text style={[styles.txLabel, { color: COLORS.textMuted }]}>Amount</Text>
-              <Text style={[styles.txValue, { color: accent }]}>Rs {item.transactionDetails.amount}</Text>
+              <Text style={[styles.txLabel, { color: COLORS.textMuted }]}>{t('notifications.amount')}</Text>
+              <Text style={[styles.txValue, { color: accent }]}>{cur.symbol} {item.transactionDetails.amount}</Text>
             </View>
             <View style={styles.txRow}>
-              <Text style={[styles.txLabel, { color: COLORS.textMuted }]}>Type</Text>
+              <Text style={[styles.txLabel, { color: COLORS.textMuted }]}>{t('notifications.type')}</Text>
               <Text style={[styles.txValue, { color: COLORS.text }]}>
-                {item.transactionDetails.payer === 'USER' ? 'Debit' : 'Credit'}
+                {item.transactionDetails.payer === 'USER' ? t('notifications.debit') : t('notifications.credit')}
               </Text>
             </View>
             {item.transactionDetails.note ? (
               <View style={styles.txRow}>
-                <Text style={[styles.txLabel, { color: COLORS.textMuted }]}>Note</Text>
+                <Text style={[styles.txLabel, { color: COLORS.textMuted }]}>{t('notifications.note')}</Text>
                 <Text style={[styles.txValue, { color: COLORS.text }]} numberOfLines={1}>{item.transactionDetails.note}</Text>
               </View>
             ) : null}
@@ -152,7 +156,7 @@ export default function NotificationsScreen() {
         <TouchableOpacity onPress={() => goBack()} hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
           <Ionicons name="chevron-back" size={28} color="#ffffff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Notifications</Text>
+        <Text style={styles.headerTitle}>{t('notifications.title')}</Text>
         <View style={{ width: 28 }} />
       </View>
 
@@ -168,7 +172,7 @@ export default function NotificationsScreen() {
             >
               <Text style={[styles.statNumber, { color: active ? info.color : COLORS.text }]}>{counts[f]}</Text>
               <Text style={[styles.statLabel, { color: active ? info.color : COLORS.textMuted }]}>
-                {f.charAt(0).toUpperCase() + f.slice(1)}
+                {f === 'all' ? t('notifications.all') : f === 'sent' ? t('notifications.sent') : f === 'pending' ? t('notifications.pending') : t('notifications.failed')}
               </Text>
             </TouchableOpacity>
           );
@@ -187,7 +191,7 @@ export default function NotificationsScreen() {
             <View style={[styles.emptyIconWrap, { backgroundColor: isDarkMode ? 'rgba(34, 211, 238, 0.05)' : 'rgba(10, 126, 164, 0.05)' }]}>
               <Ionicons name="notifications-off-outline" size={60} color={isDarkMode ? 'rgba(34, 211, 238, 0.2)' : 'rgba(10, 126, 164, 0.2)'} />
             </View>
-            <Text style={[styles.emptyTitle, { color: COLORS.text }]}>No Notifications</Text>
+            <Text style={[styles.emptyTitle, { color: COLORS.text }]}>{t('notifications.noNotifications')}</Text>
             <Text style={[styles.emptyDesc, { color: COLORS.textMuted }]}>You'll receive notifications when transactions are created</Text>
           </View>
         }

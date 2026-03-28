@@ -3,10 +3,14 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 // reanimated import removed — not used directly and causes bundler error when package isn't installed
 import Toast from 'react-native-toast-message';
+import { toastConfig } from '@/components/CustomToast';
 
 import AuthWrapper from '@/components/AuthWrapper';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { DarkModeProvider, useTheme } from '@/contexts/DarkModeContext';
+import { LanguageProvider } from '@/contexts/LanguageContext';
+import { CurrencyProvider } from '@/contexts/CurrencyContext';
+import '@/config/i18n';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -14,9 +18,13 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   return (
-    <DarkModeProvider>
-      <RootLayoutContent />
-    </DarkModeProvider>
+    <LanguageProvider>
+      <CurrencyProvider>
+        <DarkModeProvider>
+          <RootLayoutContent />
+        </DarkModeProvider>
+      </CurrencyProvider>
+    </LanguageProvider>
   );
 }
 
@@ -49,12 +57,15 @@ function RootLayoutContent() {
             <Stack.Screen name="privacy-policy" options={{ headerShown: false }} />
             <Stack.Screen name="terms-of-service" options={{ headerShown: false }} />
             <Stack.Screen name="contact-support" options={{ headerShown: false }} />
+            <Stack.Screen name="visiting-card" options={{ headerShown: false }} />
+            <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+            <Stack.Screen name="feedback" options={{ headerShown: false }} />
             <Stack.Screen name="admin-alerts" options={{ headerShown: false, presentation: 'transparentModal', animation: 'fade' }} />
             <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
           </Stack>
         </AuthWrapper>
         <StatusBar style={isDarkMode ? 'light' : 'dark'} />
-        <Toast />
+        <Toast config={toastConfig} />
       </ThemeProvider>
     </AuthProvider>
   );

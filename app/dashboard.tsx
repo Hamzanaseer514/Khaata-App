@@ -1,9 +1,13 @@
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/contexts/DarkModeContext';
 import config from '@/config/config';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { tapHaptic } from '@/utils/haptics';
 import { router, useFocusEffect } from 'expo-router';
 import React from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, Image, Platform } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, Platform } from 'react-native';
+import { Image } from 'expo-image';
 import Svg, { G, Path, Circle } from 'react-native-svg';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import BottomNav from '@/components/BottomNav';
@@ -13,6 +17,8 @@ const { LIGHT_COLORS, DARK_COLORS } = config;
 export default function DashboardScreen() {
   const { user, logout, token } = useAuth();
   const { isDarkMode } = useTheme();
+  const { t } = useTranslation();
+  const { currency: cur } = useCurrency();
   const COLORS = isDarkMode ? DARK_COLORS : LIGHT_COLORS;
   const styles = createStyles(COLORS, isDarkMode);
 
@@ -144,51 +150,51 @@ export default function DashboardScreen() {
   const modules = [
     {
       id: 'contacts',
-      title: 'Contacts',
-      description: 'Manage debt',
+      title: t('dashboard.contacts'),
+      description: t('dashboard.managedDebt'),
       icon: 'people-outline' as const,
       color: COLORS.primary,
-      onPress: () => router.push('/contacts')
+      onPress: () => { tapHaptic(); router.push('/contacts'); }
     },
     {
       id: 'personal-khaata',
-      title: 'Personal',
-      description: 'Expenses',
+      title: t('dashboard.personal'),
+      description: t('dashboard.expenses'),
       icon: 'wallet-outline' as const,
       color: COLORS.success,
-      onPress: () => router.push('/personal-khaata')
+      onPress: () => { tapHaptic(); router.push('/personal-khaata'); }
     },
     {
       id: 'group-khaata',
-      title: 'Group',
-      description: 'Split bills',
+      title: t('dashboard.group'),
+      description: t('dashboard.splitBills'),
       icon: 'git-network-outline' as const,
       color: COLORS.secondary,
-      onPress: () => router.push('/group-khaata')
+      onPress: () => { tapHaptic(); router.push('/group-khaata'); }
     },
     {
       id: 'mess',
-      title: 'Mess',
-      description: 'Daily meals',
+      title: t('dashboard.mess'),
+      description: t('dashboard.dailyMeals'),
       icon: 'restaurant-outline' as const,
       color: COLORS.warning,
-      onPress: () => router.push('/mess')
+      onPress: () => { tapHaptic(); router.push('/mess'); }
     },
     {
       id: 'notifications',
-      title: 'Alerts',
-      description: 'Stay updated',
+      title: t('dashboard.alerts'),
+      description: t('dashboard.stayUpdated'),
       icon: 'notifications-outline' as const,
       color: COLORS.info,
-      onPress: () => router.push('/notifications')
+      onPress: () => { tapHaptic(); router.push('/notifications'); }
     },
     {
       id: 'reports',
-      title: 'Reports',
-      description: 'Export data',
+      title: t('dashboard.reports'),
+      description: t('dashboard.exportData'),
       icon: 'document-text-outline' as const,
       color: COLORS.danger,
-      onPress: () => router.push('/reports')
+      onPress: () => { tapHaptic(); router.push('/reports'); }
     },
   ];
 
@@ -201,9 +207,10 @@ export default function DashboardScreen() {
             onPress={() => router.push('/profile')}
             activeOpacity={0.8}
           >
-            <Image 
-              source={require('../assets/images/avatar.png')} 
-              style={styles.avatarImage} 
+            <Image
+              source={user?.profilePicture ? { uri: user.profilePicture } : require('../assets/images/avatar.png')}
+              style={styles.avatarImage}
+              contentFit="cover"
             />
           </TouchableOpacity>
           
@@ -220,7 +227,7 @@ export default function DashboardScreen() {
                   color={isDarkMode ? '#FFD700' : '#b45309'} 
                 />
                 <Text style={styles.premiumBadgeText}>
-                  {rewardSummary?.level?.toUpperCase() || 'SILVER'} TIER
+                  {rewardSummary?.level?.toUpperCase() || 'SILVER'} {t('dashboard.tier')}
                 </Text>
               </TouchableOpacity>
               
@@ -229,7 +236,7 @@ export default function DashboardScreen() {
                 onPress={() => router.push('/rewards')} // Points usually go to rewards history
                 activeOpacity={0.7}
               >
-                <Text style={styles.miniPointsText}>{rewardSummary?.points || 0} Coins</Text>
+                <Text style={styles.miniPointsText}>{rewardSummary?.points || 0} {t('dashboard.coins')}</Text>
               </TouchableOpacity>
             </View>
             
@@ -256,23 +263,23 @@ export default function DashboardScreen() {
           {/* Total Balance Card with Glassmorphism Effect */}
           <View style={styles.glassCard}>
             <View style={styles.glassContent}>
-              <Text style={styles.cardLabel}>TOTAL OUTSTANDING</Text>
-              <Text style={styles.cardValue}>Rs {formatAmount(receivablesAmount - payablesAmount)}</Text>
+              <Text style={styles.cardLabel}>{t('dashboard.totalOutstanding')}</Text>
+              <Text style={styles.cardValue}>{cur.symbol} {formatAmount(receivablesAmount - payablesAmount)}</Text>
               <View style={styles.cardFooter}>
                 <View>
-                  <Text style={styles.smallLabel}>RECEIVABLES</Text>
-                  <Text style={[styles.smallValue, { color: COLORS.success }]}>Rs {formatAmount(receivablesAmount)}</Text>
+                  <Text style={styles.smallLabel}>{t('dashboard.receivables')}</Text>
+                  <Text style={[styles.smallValue, { color: COLORS.success }]}>{cur.symbol} {formatAmount(receivablesAmount)}</Text>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={styles.smallLabel}>PAYABLES</Text>
-                  <Text style={[styles.smallValue, { color: COLORS.danger }]}>Rs {formatAmount(payablesAmount)}</Text>
+                  <Text style={styles.smallLabel}>{t('dashboard.payables')}</Text>
+                  <Text style={[styles.smallValue, { color: COLORS.danger }]}>{cur.symbol} {formatAmount(payablesAmount)}</Text>
                 </View>
               </View>
             </View>
             <View style={styles.glowEffect} />
           </View>
 
-          <Text style={styles.sectionTitle}>Quick Access</Text>
+          <Text style={styles.sectionTitle}>{t('dashboard.quickAccess')}</Text>
           <View style={styles.modulesGrid}>
             {modules.map((module) => (
               <TouchableOpacity
@@ -294,7 +301,7 @@ export default function DashboardScreen() {
             {topOwing.length > 0 && (
               <View style={styles.topOwingSection}>
                 <View style={styles.topOwingHeader}>
-                  <Text style={styles.topOwingTitle}>TOP OWING</Text>
+                  <Text style={styles.topOwingTitle}>{t('dashboard.topOwing')}</Text>
                   <TouchableOpacity onPress={() => router.push('/contacts')}>
                     <Text style={styles.viewAllText}>View All</Text>
                   </TouchableOpacity>
@@ -380,13 +387,13 @@ export default function DashboardScreen() {
                 </View>
                 <View style={styles.legendRow}>
                   <View style={[styles.legendDot, { backgroundColor: COLORS.primary }]} />
-                  <Text style={styles.legendText}>You paid: Rs {formatAmount(monthlyBars[monthlyBars.length - 1].userPaid)}</Text>
+                  <Text style={styles.legendText}>You paid: {cur.symbol} {formatAmount(monthlyBars[monthlyBars.length - 1].userPaid)}</Text>
                 </View>
                 <View style={styles.legendRow}>
                   <View style={[styles.legendDot, { backgroundColor: COLORS.secondary }]} />
-                  <Text style={styles.legendText}>Friend paid: Rs {formatAmount(monthlyBars[monthlyBars.length - 1].friendPaid)}</Text>
+                  <Text style={styles.legendText}>Friend paid: {cur.symbol} {formatAmount(monthlyBars[monthlyBars.length - 1].friendPaid)}</Text>
                 </View>
-                <Text style={[styles.kpiLabel, { marginTop: 6 }]}>Net (You − Friend): Rs {formatAmount(monthlyBars[monthlyBars.length - 1].net)}</Text>
+                <Text style={[styles.kpiLabel, { marginTop: 6 }]}>Net (You − Friend): {cur.symbol} {formatAmount(monthlyBars[monthlyBars.length - 1].net)}</Text>
               </View>
             )}
 
@@ -420,7 +427,7 @@ export default function DashboardScreen() {
                 <Text style={styles.statLabel}>Total Contacts</Text>
               </View>
               <View style={styles.smallCard}>
-                <Text style={styles.smallNumber}>Rs {formatAmount(receivablesAmount - payablesAmount)}</Text>
+                <Text style={styles.smallNumber}>{cur.symbol} {formatAmount(receivablesAmount - payablesAmount)}</Text>
                 <Text style={styles.statLabel}>Net Receivable</Text>
               </View>
             </View>

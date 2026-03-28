@@ -17,7 +17,8 @@ import {
     View,
     StatusBar,
     Animated,
-    Keyboard
+    Keyboard,
+    ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -126,10 +127,40 @@ export default function AddContactScreen() {
     }
   };
 
+  const [isUploading, setIsUploading] = useState(false);
+
+  const uploadToCloudinary = async (uri: string): Promise<string | null> => {
+    try {
+      setIsUploading(true);
+      const formData = new FormData();
+      const filename = uri.split('/').pop() || 'photo.jpg';
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+      formData.append('image', { uri, name: filename, type } as any);
+
+      const response = await fetch(`${config.BASE_URL}/upload/image`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData,
+      });
+      const data = await response.json();
+      if (data.success) {
+        return data.data.url;
+      } else {
+        showError(data.message || 'Upload failed');
+        return null;
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      showError('Failed to upload image');
+      return null;
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const pickImage = async () => {
-    // Request permission
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
     if (status !== 'granted') {
       showError('Permission to access gallery is required');
       return;
@@ -140,11 +171,15 @@ export default function AddContactScreen() {
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.7,
-      base64: true, // We might need this for simple uploads
     });
 
     if (!result.canceled) {
-      setProfileImage(result.assets[0].uri);
+      const localUri = result.assets[0].uri;
+      setProfileImage(localUri); // Show preview immediately
+      const cloudUrl = await uploadToCloudinary(localUri);
+      if (cloudUrl) {
+        setProfileImage(cloudUrl); // Replace with Cloudinary URL
+      }
     }
   };
 
@@ -180,7 +215,9 @@ export default function AddContactScreen() {
         }
 
         if (contact.image?.uri) {
-          setProfileImage(contact.image.uri);
+          setProfileImage(contact.image.uri); // Show preview
+          const cloudUrl = await uploadToCloudinary(contact.image.uri);
+          if (cloudUrl) setProfileImage(cloudUrl);
         }
       }
     } catch {
@@ -355,10 +392,12 @@ export default function AddContactScreen() {
                 style={[styles.profileCircle, dynamicStyles.profilePlaceholder]}
                 onPress={pickImage}
               >
-                {profileImage ? (
-                  <Image 
-                    source={{ uri: profileImage }} 
-                    style={styles.selectedImage} 
+                {isUploading ? (
+                  <ActivityIndicator size="large" color={accentColor} />
+                ) : profileImage ? (
+                  <Image
+                    source={{ uri: profileImage }}
+                    style={styles.selectedImage}
                     contentFit="cover"
                   />
                 ) : (
@@ -371,7 +410,7 @@ export default function AddContactScreen() {
                 )}
               </TouchableOpacity>
               <Text style={[styles.optionalText, { color: isDarkMode ? '#64748b' : '#94a3b8' }]}>
-                {profileImage ? 'Change Photo' : 'Add Photo (Optional)'}
+                {isUploading ? 'Uploading...' : profileImage ? 'Change Photo' : 'Add Photo (Optional)'}
               </Text>
             </Animated.View>
 
@@ -480,7 +519,7 @@ export default function AddContactScreen() {
                       style={[styles.createButton, dynamicStyles.createButton, isLoading && styles.buttonDisabled]}
                       onPress={() => handleSubmit()}
                       activeOpacity={0.8}
-                      disabled={isLoading}
+                      disabled={isLoading || isUploading}
                     >
                       <Text style={styles.createButtonText}>
                         {isLoading ? (isEdit ? 'Saving...' : 'Creating...') : (isEdit ? 'Save Changes' : 'Create Contact')}

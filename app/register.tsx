@@ -2,6 +2,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/DarkModeContext';
 import { Colors } from '@/constants/theme';
 import { showError, showSuccess } from '@/utils/toast';
+import { mediumHaptic, successHaptic, errorHaptic } from '@/utils/haptics';
 import { router } from 'expo-router';
 import { Formik } from 'formik';
 import React, { useRef, useState } from 'react';
@@ -20,6 +21,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Yup from 'yup';
+import { useTranslation } from 'react-i18next';
 
 const validationSchema = Yup.object().shape({
   name: Yup.string()
@@ -40,6 +42,7 @@ const validationSchema = Yup.object().shape({
 export default function RegisterScreen() {
   const { requestSignupOtp } = useAuth();
   const { isDarkMode, toggleTheme } = useTheme();
+  const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
@@ -86,28 +89,35 @@ export default function RegisterScreen() {
   }, []);
 
   const handleRegister = async (values: { name: string; email: string; password: string; confirmPassword: string }) => {
+    mediumHaptic();
     setIsLoading(true);
 
     try {
       if (values.password !== values.confirmPassword) {
+        errorHaptic();
         showError('Passwords must match');
         return;
       }
       const result = await requestSignupOtp(values.name, values.email, values.password);
 
       if (result.success) {
+        successHaptic();
         showSuccess('OTP sent to your email');
         router.push({ pathname: '/verify-otp', params: { email: values.email } });
       } else {
+        errorHaptic();
         showError(result.message || 'Registration failed');
       }
     } catch (error) {
       console.error('Register error:', error);
       if (error instanceof TypeError && error.message.includes('fetch')) {
+        errorHaptic();
         showError('Please check your internet connection and try again.', 'Network Error');
       } else if (error instanceof Error) {
+        errorHaptic();
         showError(error.message || 'An unexpected error occurred. Please try again.');
       } else {
+        errorHaptic();
         showError('An unexpected error occurred. Please try again.');
       }
     } finally {
@@ -207,7 +217,7 @@ export default function RegisterScreen() {
                   { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
                 ]}
               >
-                <Text style={[styles.titleText, dynamicStyles.welcomeText]}>Create Account</Text>
+                <Text style={[styles.titleText, dynamicStyles.welcomeText]}>{t('auth.createAccount')}</Text>
                 <View style={[styles.accentLine, dynamicStyles.accentLine]} />
               </Animated.View>
             </View>
@@ -233,7 +243,7 @@ export default function RegisterScreen() {
                   <View style={styles.form}>
                     {/* Name Field */}
                     <View style={styles.inputWrapper}>
-                      <Text style={[styles.inputLabel, dynamicStyles.inputLabel]}>Full Name</Text>
+                      <Text style={[styles.inputLabel, dynamicStyles.inputLabel]}>{t('auth.fullName')}</Text>
                       <TextInput
                         style={[
                           styles.input,
@@ -259,7 +269,7 @@ export default function RegisterScreen() {
 
                     {/* Email Field */}
                     <View style={styles.inputWrapper}>
-                      <Text style={[styles.inputLabel, dynamicStyles.inputLabel]}>Email</Text>
+                      <Text style={[styles.inputLabel, dynamicStyles.inputLabel]}>{t('auth.email')}</Text>
                       <TextInput
                         style={[
                           styles.input,
@@ -286,7 +296,7 @@ export default function RegisterScreen() {
 
                     {/* Password Field */}
                     <View style={styles.inputWrapper}>
-                      <Text style={[styles.inputLabel, dynamicStyles.inputLabel]}>Password</Text>
+                      <Text style={[styles.inputLabel, dynamicStyles.inputLabel]}>{t('auth.password')}</Text>
                       <View style={[
                         styles.passwordContainer,
                         dynamicStyles.input,
@@ -326,7 +336,7 @@ export default function RegisterScreen() {
 
                     {/* Confirm Password Field */}
                     <View style={styles.inputWrapper}>
-                      <Text style={[styles.inputLabel, dynamicStyles.inputLabel]}>Confirm Password</Text>
+                      <Text style={[styles.inputLabel, dynamicStyles.inputLabel]}>{t('auth.confirmPassword')}</Text>
                       <View style={[
                         styles.passwordContainer,
                         dynamicStyles.input,
@@ -371,9 +381,9 @@ export default function RegisterScreen() {
                       disabled={isLoading}
                     >
                       {isLoading ? (
-                        <Text style={styles.registerButtonText}>Creating Account...</Text>
+                        <Text style={styles.registerButtonText}>{t('auth.creatingAccount')}</Text>
                       ) : (
-                        <Text style={styles.registerButtonText}>Create Account</Text>
+                        <Text style={styles.registerButtonText}>{t('auth.createAccount')}</Text>
                       )}
                     </TouchableOpacity>
                   </View>
@@ -384,10 +394,10 @@ export default function RegisterScreen() {
             {/* Footer */}
             <Animated.View style={[styles.footer, { opacity: fadeAnim }]}>
               <Text style={[styles.footerText, { color: isDarkMode ? '#64748b' : '#94a3b8' }]}>
-                Already have an account?{' '}
+                {t('auth.haveAccount')}{' '}
               </Text>
               <TouchableOpacity onPress={() => router.push('/login')}>
-                <Text style={[styles.loginLink, { color: accentColor }]}>Sign In</Text>
+                <Text style={[styles.loginLink, { color: accentColor }]}>{t('auth.signIn')}</Text>
               </TouchableOpacity>
             </Animated.View>
           </View>

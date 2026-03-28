@@ -49,9 +49,10 @@ const createTransactionNotification = async (transactionId, userId, contactId) =
       type: transactionId.payer === 'USER' ? 'DEBIT' : 'CREDIT',
       amount: transactionId.amount,
       contactName: contact.name,
-      userName: user.name, // Add user's name
+      userName: user.name,
       updatedBalance: contact.balance,
-      description: transactionId.note
+      description: transactionId.note,
+      visitingCard: user.visitingCard || null,
     };
     
     console.log('Sending email to:', contact.email);

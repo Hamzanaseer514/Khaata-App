@@ -29,6 +29,14 @@
     "plugins": [
       "expo-router",
       [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow KhaataWise to save cards to your gallery.",
+          "savePhotosPermission": "Allow KhaataWise to save cards to your gallery.",
+          "isAccessMediaLocationEnabled": true
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/images/khaatawise_dark.png",
@@ -39,7 +47,8 @@
             "backgroundColor": "#0a0a0c"
           }
         }
-      ]
+      ],
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true,

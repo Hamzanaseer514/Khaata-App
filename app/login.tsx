@@ -2,6 +2,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/DarkModeContext';
 import { Colors } from '@/constants/theme';
 import { showError, showSuccess } from '@/utils/toast';
+import { mediumHaptic, successHaptic, errorHaptic } from '@/utils/haptics';
 import { router } from 'expo-router';
 import { Formik } from 'formik';
 import React, { useRef, useState } from 'react';
@@ -21,6 +22,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Yup from 'yup';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTranslation } from 'react-i18next';
 
 const validationSchema = Yup.object().shape({
   email: Yup.string()
@@ -33,6 +35,7 @@ const validationSchema = Yup.object().shape({
 export default function LoginScreen() {
   const { login } = useAuth();
   const { isDarkMode, toggleTheme } = useTheme();
+  const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
@@ -78,6 +81,7 @@ export default function LoginScreen() {
   }, []);
 
   const handleLogin = async (values: { email: string; password: string }) => {
+    mediumHaptic();
     setIsLoading(true);
 
     try {
@@ -85,18 +89,23 @@ export default function LoginScreen() {
 
       if (result.success) {
         const isAdmin = result.user?.role === 'admin';
+        successHaptic();
         showSuccess(result.message || (isAdmin ? 'Welcome admin' : 'Logged in'));
         router.replace(isAdmin ? '/admin' : '/dashboard');
       } else {
+        errorHaptic();
         showError(result.message || 'Login failed');
       }
     } catch (error) {
       console.error('Login error:', error);
       if (error instanceof TypeError && error.message.includes('fetch')) {
+        errorHaptic();
         showError('Please check your internet connection and try again.', 'Network Error');
       } else if (error instanceof Error) {
+        errorHaptic();
         showError(error.message || 'An unexpected error occurred. Please try again.');
       } else {
+        errorHaptic();
         showError('An unexpected error occurred. Please try again.');
       }
     } finally {
@@ -199,8 +208,8 @@ export default function LoginScreen() {
                   { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
                 ]}
               >
-                <Text style={[styles.welcomeBackText, dynamicStyles.welcomeBackText]}>Welcome</Text>
-                <Text style={[styles.backTextBold, dynamicStyles.backTextBold]}>Back</Text>
+                <Text style={[styles.welcomeBackText, dynamicStyles.welcomeBackText]}>{t('auth.welcome')}</Text>
+                <Text style={[styles.backTextBold, dynamicStyles.backTextBold]}>{t('common.back')}</Text>
                 <View style={[styles.accentLine, dynamicStyles.accentLine]} />
               </Animated.View>
             </View>
@@ -225,7 +234,7 @@ export default function LoginScreen() {
                 {({ handleChange, handleBlur, handleSubmit, values, errors, touched }) => (
                   <View style={styles.form}>
                     <View style={styles.inputWrapper}>
-                      <Text style={[styles.inputLabel, dynamicStyles.inputLabel]}>Email</Text>
+                      <Text style={[styles.inputLabel, dynamicStyles.inputLabel]}>{t('auth.email')}</Text>
                       <TextInput
                         style={[
                           styles.input,
@@ -248,7 +257,7 @@ export default function LoginScreen() {
                     </View>
 
                     <View style={styles.inputWrapper}>
-                      <Text style={[styles.inputLabel, dynamicStyles.inputLabel]}>Password</Text>
+                      <Text style={[styles.inputLabel, dynamicStyles.inputLabel]}>{t('auth.password')}</Text>
                       <View style={[
                         styles.passwordContainer,
                         dynamicStyles.input,
@@ -287,7 +296,7 @@ export default function LoginScreen() {
                       style={styles.forgotPassword}
                       onPress={() => router.push('/forgot-password')}
                     >
-                      <Text style={[styles.forgotText, { color: accentColor }]}>Forgot Password?</Text>
+                      <Text style={[styles.forgotText, { color: accentColor }]}>{t('auth.forgotPassword')}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -297,9 +306,9 @@ export default function LoginScreen() {
                       disabled={isLoading}
                     >
                       {isLoading ? (
-                        <Text style={styles.loginButtonText}>Signing in...</Text>
+                        <Text style={styles.loginButtonText}>{t('auth.signingIn')}</Text>
                       ) : (
-                        <Text style={styles.loginButtonText}>Sign In</Text>
+                        <Text style={styles.loginButtonText}>{t('auth.signIn')}</Text>
                       )}
                     </TouchableOpacity>
                   </View>
@@ -310,10 +319,10 @@ export default function LoginScreen() {
             {/* Footer */}
             <Animated.View style={[styles.footer, { opacity: fadeAnim }]}>
               <Text style={[styles.footerText, { color: isDarkMode ? '#64748b' : '#94a3b8' }]}>
-                Don't have an account?{' '}
+                {t('auth.noAccount')}{' '}
               </Text>
               <TouchableOpacity onPress={() => router.push('/register')}>
-                <Text style={[styles.signupLink, { color: accentColor }]}>Sign Up</Text>
+                <Text style={[styles.signupLink, { color: accentColor }]}>{t('auth.signUp')}</Text>
               </TouchableOpacity>
             </Animated.View>
           </View>

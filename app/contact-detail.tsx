@@ -1,6 +1,8 @@
 import { useAuth } from '@/contexts/AuthContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { useTheme } from '@/contexts/DarkModeContext';
 import { showError, showSuccess } from '@/utils/toast';
+import { tapHaptic, successHaptic, selectionHaptic } from '@/utils/haptics';
 import { goBack } from '@/utils/navigation';
 import * as FileSystem from 'expo-file-system/legacy';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -577,6 +579,7 @@ export default function ContactDetailScreen() {
   const { contactId } = useLocalSearchParams();
   const { token } = useAuth();
   const { isDarkMode } = useTheme();
+  const { currency: cur } = useCurrency();
   const COLORS = isDarkMode ? config.DARK_COLORS : config.LIGHT_COLORS;
   
   const [contact, setContact] = useState<Contact | null>(null);
@@ -803,7 +806,7 @@ export default function ContactDetailScreen() {
               styles.transactionAmount,
               { color: !isUserPaid ? '#22c55e' : '#ef4444' }
             ]}>
-              {!isUserPaid ? '+' : '-'} Rs {Math.round(item.amount)}
+              {!isUserPaid ? '+' : '-'} {cur.symbol} {Math.round(item.amount)}
             </Text>
             <Text style={styles.transactionStatus}>
               {!isUserPaid ? 'Received' : 'Sent'}
@@ -868,7 +871,7 @@ export default function ContactDetailScreen() {
                 {contact.profilePicture ? (
                   <Image source={{ uri: contact.profilePicture }} style={styles.avatar} contentFit="cover" />
                 ) : (
-                  <Text style={styles.avatarInitial}>{contact.name.charAt(0).toUpperCase()}</Text>
+                  <Image source={require('../assets/images/avatar_male_2.png')} style={styles.avatar} contentFit="cover" />
                 )}
               </View>
             </View>
@@ -963,7 +966,7 @@ export default function ContactDetailScreen() {
             styles.balanceAmountMain,
             { color: contact.balance > 0 ? '#22c55e' : contact.balance < 0 ? '#ef4444' : COLORS.textMuted }
           ]}>
-            Rs {Math.round(Math.abs(contact.balance))}
+            {cur.symbol} {Math.round(Math.abs(contact.balance))}
           </Text>
           
           <Text style={styles.balanceStatusSubtext}>
@@ -975,11 +978,11 @@ export default function ContactDetailScreen() {
           <View style={styles.balanceFooter}>
             <View style={styles.footerItemContent}>
               <Text style={styles.footerLabel}>Total Settled</Text>
-              <Text style={styles.footerValue}>Rs {Math.round(transactions.reduce((acc, t) => acc + t.amount, 0))}</Text>
+              <Text style={styles.footerValue}>{cur.symbol} {Math.round(transactions.reduce((acc, t) => acc + t.amount, 0))}</Text>
             </View>
             <View style={[styles.footerItemContent, { alignItems: 'flex-end' }]}>
               <Text style={styles.footerLabel}>{contact.balance >= 0 ? 'Pending In' : 'Pending Out'}</Text>
-              <Text style={[styles.footerValue, styles.pendingValue]}>Rs {Math.round(Math.abs(contact.balance))}</Text>
+              <Text style={[styles.footerValue, styles.pendingValue]}>{cur.symbol} {Math.round(Math.abs(contact.balance))}</Text>
             </View>
           </View>
         </Animated.View>
@@ -1071,6 +1074,7 @@ function AddTransactionModal({ contactId, onClose, onSuccess, token, COLORS, edi
       });
       const data = await response.json();
       if (data.success) {
+        successHaptic();
         showSuccess(editingTransaction ? 'Updated successfully!' : 'Added successfully!');
         onSuccess();
       } else showError(data.message);
@@ -1101,6 +1105,7 @@ function AddTransactionModal({ contactId, onClose, onSuccess, token, COLORS, edi
               });
               const data = await response.json();
               if (data.success) {
+                successHaptic();
                 showSuccess('Deleted successfully!');
                 onSuccess();
               } else showError(data.message);

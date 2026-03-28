@@ -1,5 +1,7 @@
 import { useAuth } from '@/contexts/AuthContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { showError } from '@/utils/toast';
+import { tapHaptic, heavyHaptic, selectionHaptic } from '@/utils/haptics';
 import { router, useFocusEffect } from 'expo-router';
 import { goBack } from '@/utils/navigation';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -18,6 +20,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { useTranslation } from 'react-i18next';
 import config from '../config/config';
 import BottomNav from '@/components/BottomNav';
 import { useTheme } from '@/contexts/DarkModeContext';
@@ -38,7 +41,9 @@ interface Contact {
 
 export default function ContactsListScreen() {
   const { token } = useAuth();
+  const { t } = useTranslation();
   const { isDarkMode } = useTheme(); // Use isDarkMode from useTheme
+  const { currency: cur } = useCurrency();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
@@ -161,6 +166,7 @@ export default function ContactsListScreen() {
     if (!confirmDeleteId) return;
     setSubmitting(true);
     try {
+      heavyHaptic();
       const res = await fetch(`${config.BASE_URL}/contacts/${confirmDeleteId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` },
@@ -234,15 +240,17 @@ export default function ContactsListScreen() {
       >
         <View style={[styles.contactAvatar, dynamicStyles.avatarCircle, { backgroundColor: isDarkMode ? 'rgba(34, 211, 238, 0.1)' : 'rgba(10, 126, 164, 0.05)' }]}>
             {item.profilePicture ? (
-              <Image 
-                source={{ uri: item.profilePicture }} 
-                style={styles.avatarImage} 
+              <Image
+                source={{ uri: item.profilePicture }}
+                style={styles.avatarImage}
                 contentFit="cover"
               />
             ) : (
-              <Text style={[styles.avatarText, { color: isDarkMode ? '#22d3ee' : '#0a7ea4' }]}>
-                {item.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
-              </Text>
+              <Image
+                source={require('../assets/images/avatar_male_2.png')}
+                style={styles.avatarImage}
+                contentFit="cover"
+              />
             )}
         </View>
         <View style={styles.contactInfo}>
@@ -254,15 +262,15 @@ export default function ContactsListScreen() {
             {item.name}
           </Text>
           <Text style={[styles.contactSubtext, { color: isDarkMode ? '#94a3b8' : '#64748b' }]}>
-            Last entry: {formatLastEntry(item)}
+            {t('contacts.lastEntry')}: {formatLastEntry(item)}
           </Text>
         </View>
         <View style={styles.contactBalance}>
             <Text style={[styles.balanceAmount, { color: item.balance > 0 ? '#22c55e' : item.balance < 0 ? '#ef4444' : (isDarkMode ? '#64748b' : '#94a3b8') }]}>
-            Rs {Math.round(Math.abs(item.balance)).toLocaleString()}
+            {cur.symbol} {Math.round(Math.abs(item.balance)).toLocaleString()}
           </Text>
           <Text style={[styles.balanceLabel, { color: item.balance > 0 ? '#22c55e' : item.balance < 0 ? '#ef4444' : (isDarkMode ? '#475569' : '#94a3b8') }]}>
-            {item.balance > 0 ? "YOU'LL GET" : item.balance < 0 ? "YOU'LL GIVE" : 'SETTLED'}
+            {item.balance > 0 ? t('contacts.youllGet') : item.balance < 0 ? t('contacts.youllGive') : t('common.settled')}
           </Text>
         </View>
       </TouchableOpacity>
@@ -313,13 +321,13 @@ export default function ContactsListScreen() {
           activeFilter === 'all' && { backgroundColor: accentColor },
           { borderColor: activeFilter === 'all' ? accentColor : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'), borderWidth: 1 }
         ]}
-        onPress={() => setActiveFilter('all')}
+        onPress={() => { selectionHaptic(); setActiveFilter('all'); }}
       >
         <Text style={[
           styles.filterText, 
           { color: activeFilter === 'all' ? '#fff' : (isDarkMode ? '#94a3b8' : '#475569') }
         ]}>
-          All Contacts
+          {t('contacts.all')}
         </Text>
       </TouchableOpacity>
       <TouchableOpacity 
@@ -328,13 +336,13 @@ export default function ContactsListScreen() {
           activeFilter === 'give' && { backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.1)' },
           { borderColor: activeFilter === 'give' ? '#ef4444' : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'), borderWidth: 1 }
         ]}
-        onPress={() => setActiveFilter('give')}
+        onPress={() => { selectionHaptic(); setActiveFilter('give'); }}
       >
         <Text style={[
           styles.filterText, 
           { color: activeFilter === 'give' ? '#ef4444' : (isDarkMode ? '#94a3b8' : '#475569') }
         ]}>
-          You'll Give
+          {t('contacts.youllGive')}
         </Text>
       </TouchableOpacity>
       <TouchableOpacity 
@@ -343,13 +351,13 @@ export default function ContactsListScreen() {
           activeFilter === 'get' && { backgroundColor: isDarkMode ? 'rgba(34, 197, 94, 0.2)' : 'rgba(34, 197, 94, 0.1)' },
           { borderColor: activeFilter === 'get' ? '#22c55e' : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'), borderWidth: 1 }
         ]}
-        onPress={() => setActiveFilter('get')}
+        onPress={() => { selectionHaptic(); setActiveFilter('get'); }}
       >
         <Text style={[
           styles.filterText, 
           { color: activeFilter === 'get' ? '#22c55e' : (isDarkMode ? '#94a3b8' : '#475569') }
         ]}>
-          You'll Get
+          {t('contacts.youllGet')}
         </Text>
       </TouchableOpacity>
     </Animated.View>
@@ -365,7 +373,7 @@ export default function ContactsListScreen() {
         />
       </View>
       <Text style={[styles.emptyTitle, { color: themeColors.text }]}>
-        {searchQuery.trim() ? 'No Results Found' : 'No Contacts Yet'}
+        {searchQuery.trim() ? t('contacts.noResults') : t('contacts.noContacts')}
       </Text>
       <Text style={[styles.emptyDescription, { color: isDarkMode ? '#64748b' : '#94a3b8' }]}>
         {searchQuery.trim() 
@@ -379,7 +387,7 @@ export default function ContactsListScreen() {
           onPress={handleAddContact}
           activeOpacity={0.8}
         >
-          <Text style={styles.addFirstButtonText}>Add First Contact</Text>
+          <Text style={styles.addFirstButtonText}>{t('contacts.addFirstContact')}</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -434,7 +442,7 @@ export default function ContactsListScreen() {
     return (
       <View style={[styles.loadingContainer, dynamicStyles.container]}>
         <ActivityIndicator size="large" color={accentColor} />
-        <Text style={[styles.loadingText, { color: isDarkMode ? '#94a3b8' : '#7f8c8d' }]}>Loading contacts...</Text>
+        <Text style={[styles.loadingText, { color: isDarkMode ? '#94a3b8' : '#7f8c8d' }]}>{t('contacts.loadingContacts')}</Text>
       </View>
     );
   }
@@ -452,7 +460,7 @@ export default function ContactsListScreen() {
           <Ionicons name="chevron-back" size={28} color="#ffffff" />
         </TouchableOpacity>
         
-        <Text style={dynamicStyles.headerTitle}>My Contacts</Text>
+        <Text style={dynamicStyles.headerTitle}>{t('contacts.title')}</Text>
         
         <TouchableOpacity 
           style={styles.addButton} 
@@ -470,7 +478,7 @@ export default function ContactsListScreen() {
             <Ionicons name="search-outline" size={18} color={placeholderColor} style={{ marginRight: 10 }} />
             <TextInput
               style={[styles.searchInput, dynamicStyles.searchInput, { fontSize: 15 }]}
-              placeholder="Search by name or number..."
+              placeholder={t('contacts.searchPlaceholder')}
               placeholderTextColor={placeholderColor}
               value={searchQuery}
               onChangeText={handleSearchChange}
@@ -533,14 +541,14 @@ export default function ContactsListScreen() {
       {confirmDeleteId && (
         <View style={styles.modalOverlay}>
           <View style={[styles.confirmModal, { backgroundColor: isDarkMode ? '#1e293b' : '#ffffff' }]}>
-            <Text style={[styles.modalTitle, { color: themeColors.text }]}>Delete contact?</Text>
+            <Text style={[styles.modalTitle, { color: themeColors.text }]}>{t('contacts.deleteContact')}</Text>
             <Text style={[styles.confirmText, { color: isDarkMode ? '#94a3b8' : '#7f8c8d' }]}>This will also delete all related transaction records. This action cannot be undone.</Text>
             <View style={styles.modalActions}>
               <TouchableOpacity style={[styles.cancelBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : '#f3f4f6' }]} onPress={() => setConfirmDeleteId(null)}>
-                <Text style={[styles.cancelText, { color: themeColors.text }]}>No, Keep it</Text>
+                <Text style={[styles.cancelText, { color: themeColors.text }]}>{t('contacts.noKeep')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.deleteBtn, submitting && { opacity: 0.6 }]} onPress={confirmDelete} disabled={submitting}>
-                <Text style={styles.deleteText}>{submitting ? 'Deleting…' : 'Yes, Delete'}</Text>
+                <Text style={styles.deleteText}>{submitting ? 'Deleting…' : t('contacts.yesDelete')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -614,12 +622,12 @@ const styles = StyleSheet.create({
     paddingLeft: 2,
   },
   contactName: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     marginBottom: 1,
   },
   contactSubtext: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '400',
   },
   contactBalance: {
@@ -627,7 +635,7 @@ const styles = StyleSheet.create({
     minWidth: 90,
   },
   balanceAmount: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '800',
   },
   balanceLabel: {

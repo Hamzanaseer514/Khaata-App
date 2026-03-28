@@ -1,13 +1,14 @@
+import { tapHaptic, warningHaptic, successHaptic } from '@/utils/haptics';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/DarkModeContext';
 import config from '@/config/config';
 import { goBack } from '@/utils/navigation';
+import { showError, showSuccess } from '@/utils/toast';
 import { router } from 'expo-router';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
-  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,24 +16,47 @@ import {
   View,
   StatusBar,
   Platform,
-  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import BottomNav from '@/components/BottomNav';
+import { TEMPLATES } from '@/app/visiting-card';
+import { CustomCard, CardWatermark } from '@/components/CustomCardBuilder';
+import { captureRef } from 'react-native-view-shot';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import { useTranslation } from 'react-i18next';
 
 const { width, height } = Dimensions.get('window');
 
 export default function ProfileScreen() {
-  const { user, logout, token } = useAuth();
+  const { user, logout, token, updateUser } = useAuth();
+  const { t } = useTranslation();
   const { isDarkMode } = useTheme();
   const COLORS = isDarkMode ? config.DARK_COLORS : config.LIGHT_COLORS;
-  const styles = createStyles(COLORS, isDarkMode);
+  const accent = isDarkMode ? '#22d3ee' : '#0a7ea4';
+  const styles = createStyles(COLORS, isDarkMode, accent);
 
   const [summary, setSummary] = React.useState<{ points: number; level: string } | null>(null);
-  const [showLogoutConfirm, setShowLogoutConfirm] = React.useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
+  const savedCardRef = useRef<any>(null);
+
+  const shareProfileCard = async () => {
+    try {
+      const uri = await captureRef(savedCardRef, { format: 'png', quality: 1 });
+      const file = `${FileSystem.documentDirectory}visiting_card_share.png`;
+      await FileSystem.copyAsync({ from: uri, to: file });
+      await Sharing.shareAsync(file, { mimeType: 'image/png', dialogTitle: 'Share Visiting Card' });
+    } catch (e) {
+      console.error('Share card error:', e);
+    }
+  };
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
 
   useEffect(() => {
@@ -71,29 +95,96 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleLogout = () => { setShowLogoutConfirm(true); };
+  const pickAndUploadImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      showError('Permission to access gallery is required');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+
+    if (result.canceled) return;
+
+    const localUri = result.assets[0].uri;
+    setIsUploading(true);
+
+    try {
+      // Upload to Cloudinary
+      const formData = new FormData();
+      const filename = localUri.split('/').pop() || 'photo.jpg';
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+      formData.append('image', { uri: localUri, name: filename, type } as any);
+
+      const uploadRes = await fetch(`${config.BASE_URL}/upload/image`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData,
+      });
+      const uploadData = await uploadRes.json();
+
+      if (!uploadData.success) {
+        showError(uploadData.message || 'Upload failed');
+        return;
+      }
+
+      const cloudUrl = uploadData.data.url;
+
+      // Save to user profile
+      const profileRes = await fetch(`${config.BASE_URL}/auth/update-profile`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ profilePicture: cloudUrl }),
+      });
+      const profileData = await profileRes.json();
+
+      if (profileData.success) {
+        await updateUser({ profilePicture: cloudUrl });
+        successHaptic();
+        showSuccess('Profile picture updated!');
+      } else {
+        showError(profileData.message || 'Failed to update profile');
+      }
+    } catch (error) {
+      console.error('Profile picture update error:', error);
+      showError('Failed to update profile picture');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleLogout = () => { warningHaptic(); setShowLogoutConfirm(true); };
   const confirmLogout = async () => { setShowLogoutConfirm(false); await logout(); router.replace('/login'); };
 
-  const memberSince = user?.createdAt 
+  const memberSince = user?.createdAt
     ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
     : 'March 2026';
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      
+
       {/* Background Decor */}
       <View style={styles.topGlow} />
 
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton} 
+          <TouchableOpacity
+            style={styles.backButton}
             onPress={() => goBack()}
             activeOpacity={0.7}
           >
@@ -101,14 +192,14 @@ export default function ProfileScreen() {
               <Ionicons name="chevron-back" size={24} color={COLORS.text} />
             </View>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>My Profile</Text>
+          <Text style={styles.headerTitle}>{t('profile.title')}</Text>
           <TouchableOpacity style={styles.editButton} activeOpacity={0.7} onPress={() => router.push('/settings')}>
             <Ionicons name="settings-outline" size={24} color={COLORS.text} />
           </TouchableOpacity>
         </View>
 
         {/* Profile Card */}
-        <Animated.View 
+        <Animated.View
           style={[
             styles.profileCard,
             {
@@ -117,31 +208,50 @@ export default function ProfileScreen() {
             }
           ]}
         >
-          <View style={styles.avatarWrapper}>
+          <TouchableOpacity
+            style={styles.avatarWrapper}
+            activeOpacity={0.8}
+            onPress={pickAndUploadImage}
+            disabled={isUploading}
+          >
             <View style={styles.avatarGlow} />
             <View style={styles.avatarContainer}>
-              <Image 
-                source={require('../assets/images/avatar.png')} 
-                style={styles.avatarImage} 
-              />
+              {isUploading ? (
+                <View style={styles.uploadingOverlay}>
+                  <ActivityIndicator size="large" color={accent} />
+                </View>
+              ) : user?.profilePicture ? (
+                <Image
+                  source={{ uri: user.profilePicture }}
+                  style={styles.avatarImage}
+                  contentFit="cover"
+                />
+              ) : (
+                <Image
+                  source={require('../assets/images/avatar.png')}
+                  style={styles.avatarImage}
+                  contentFit="cover"
+                />
+              )}
             </View>
-            <View style={styles.badgeContainer}>
-              <MaterialCommunityIcons name="check-decagram" size={24} color="#FFD700" />
+            {/* Camera badge */}
+            <View style={styles.cameraBadge}>
+              <Ionicons name="camera" size={14} color="#fff" />
             </View>
-          </View>
+          </TouchableOpacity>
 
-          <Text style={styles.userName}>{user?.name || 'Guest User'}</Text>
+          <Text style={styles.userName}>{user?.name || t('profile.guestUser')}</Text>
           <Text style={styles.userEmail}>{user?.email || 'user@khaata-wise.com'}</Text>
-          
-          <TouchableOpacity 
+
+          <TouchableOpacity
             style={[styles.rewardBadge, { borderColor: summary?.level === 'Platinum' ? '#e5e7eb' : summary?.level === 'Gold' ? '#fbbf24' : '#94a3b8' }]}
             onPress={() => router.push('/rewards')}
             activeOpacity={0.7}
           >
-            <MaterialCommunityIcons 
-              name={summary?.level === 'Platinum' ? 'trophy-variant' : 'trophy'} 
-              size={14} 
-              color={summary?.level === 'Platinum' ? '#94a3b8' : summary?.level === 'Gold' ? '#b8860b' : '#64748b'} 
+            <MaterialCommunityIcons
+              name={summary?.level === 'Platinum' ? 'trophy-variant' : 'trophy'}
+              size={14}
+              color={summary?.level === 'Platinum' ? '#94a3b8' : summary?.level === 'Gold' ? '#b8860b' : '#64748b'}
             />
             <Text style={[styles.rewardBadgeText, { color: summary?.level === 'Platinum' ? '#94a3b8' : summary?.level === 'Gold' ? '#b8860b' : '#64748b' }]}>
               {summary?.level?.toUpperCase() || 'SILVER'} TIER
@@ -150,31 +260,81 @@ export default function ProfileScreen() {
         </Animated.View>
 
         {/* Stats Section */}
-        <Animated.View 
+        <Animated.View
           style={[
             styles.statsRow,
             { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
           ]}
         >
           <View style={[styles.statCard, { backgroundColor: isDarkMode ? 'rgba(34, 197, 94, 0.1)' : '#ecfdf5' }]}>
-            <Text style={[styles.statLabel, { color: '#22c55e' }]}>MEMBER SINCE</Text>
+            <Text style={[styles.statLabel, { color: '#22c55e' }]}>{t('profile.memberSince')}</Text>
             <Text style={styles.statValue}>{memberSince}</Text>
           </View>
           <View style={[styles.statCard, { backgroundColor: isDarkMode ? 'rgba(59, 130, 246, 0.1)' : '#eff6ff' }]}>
-            <Text style={[styles.statLabel, { color: '#3b82f6' }]}>ACCOUNT TYPE</Text>
+            <Text style={[styles.statLabel, { color: '#3b82f6' }]}>{t('profile.accountType')}</Text>
             <Text style={styles.statValue}>{user?.role?.toUpperCase() || 'USER'}</Text>
           </View>
         </Animated.View>
 
+        {/* Saved Visiting Card - Exact same design user created */}
+        {user?.visitingCard ? (
+          <Animated.View style={[{ paddingHorizontal: 20, marginTop: 30, opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <Text style={styles.sectionTitle}>{t('profile.myVisitingCard')}</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <TouchableOpacity
+                  onPress={shareProfileCard}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : '#f1f5f9' }}
+                >
+                  <Ionicons name="share-outline" size={14} color={accent} />
+                  <Text style={{ color: accent, fontSize: 12, fontWeight: '700' }}>{t('common.share')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => router.push('/visiting-card')}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : '#f1f5f9' }}
+                >
+                  <Ionicons name="create-outline" size={14} color={accent} />
+                  <Text style={{ color: accent, fontSize: 12, fontWeight: '700' }}>{t('common.edit')}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            <View ref={savedCardRef} collapsable={false}>
+              {(user.visitingCard as any)?.isCustom ? (
+                <CustomCard
+                  data={(user.visitingCard as any).cardData}
+                  design={(user.visitingCard as any).customDesign}
+                />
+              ) : (() => {
+                const tmpl = TEMPLATES.find(t => t.id === (user.visitingCard as any)?.templateId);
+                const CardComp = tmpl?.Component;
+                return CardComp ? (
+                  <View style={{ position: 'relative' }}>
+                    <CardComp data={(user.visitingCard as any).cardData} isDark={isDarkMode} />
+                    <CardWatermark light={!isDarkMode} />
+                  </View>
+                ) : null;
+              })()}
+            </View>
+          </Animated.View>
+        ) : null}
+
         {/* Action List */}
         <View style={styles.actionSection}>
-          <Text style={styles.sectionTitle}>Account Settings</Text>
-          
+          <Text style={styles.sectionTitle}>{t('profile.accountSettings')}</Text>
+
+          <TouchableOpacity style={styles.actionItem} onPress={() => router.push('/visiting-card')}>
+            <View style={[styles.actionIcon, { backgroundColor: 'rgba(217, 119, 6, 0.1)' }]}>
+              <Ionicons name="card-outline" size={20} color="#d97706" />
+            </View>
+            <Text style={styles.actionText}>{user?.visitingCard ? t('profile.editVisitingCard') : t('profile.createVisitingCard')}</Text>
+            <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
+          </TouchableOpacity>
+
           <TouchableOpacity style={styles.actionItem} onPress={() => router.push('/rewards')}>
             <View style={[styles.actionIcon, { backgroundColor: 'rgba(255, 215, 0, 0.1)' }]}>
               <MaterialCommunityIcons name="trophy-outline" size={20} color="#FFD700" />
             </View>
-            <Text style={styles.actionText}>My Rewards</Text>
+            <Text style={styles.actionText}>{t('profile.myRewards')}</Text>
             <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
           </TouchableOpacity>
 
@@ -182,7 +342,7 @@ export default function ProfileScreen() {
             <View style={[styles.actionIcon, { backgroundColor: 'rgba(99, 102, 241, 0.1)' }]}>
               <Ionicons name="lock-closed-outline" size={20} color="#6366f1" />
             </View>
-            <Text style={styles.actionText}>Change Password</Text>
+            <Text style={styles.actionText}>{t('profile.changePassword')}</Text>
             <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
           </TouchableOpacity>
 
@@ -190,7 +350,7 @@ export default function ProfileScreen() {
             <View style={[styles.actionIcon, { backgroundColor: 'rgba(10, 126, 164, 0.1)' }]}>
               <Ionicons name="notifications-outline" size={20} color={COLORS.primary} />
             </View>
-            <Text style={styles.actionText}>Notifications</Text>
+            <Text style={styles.actionText}>{t('profile.notifications')}</Text>
             <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
           </TouchableOpacity>
 
@@ -198,7 +358,7 @@ export default function ProfileScreen() {
             <View style={[styles.actionIcon, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
               <Ionicons name="shield-checkmark-outline" size={20} color="#f59e0b" />
             </View>
-            <Text style={styles.actionText}>Settings & Privacy</Text>
+            <Text style={styles.actionText}>{t('profile.settingsPrivacy')}</Text>
             <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
           </TouchableOpacity>
 
@@ -206,13 +366,13 @@ export default function ProfileScreen() {
             <View style={[styles.actionIcon, { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
               <Ionicons name="log-out-outline" size={20} color="#ef4444" />
             </View>
-            <Text style={[styles.actionText, { color: '#ef4444' }]}>Sign Out</Text>
+            <Text style={[styles.actionText, { color: '#ef4444' }]}>{t('profile.signOut')}</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>Khaata Wise v1.0.4</Text>
-          <Text style={styles.footerSubtext}>Made with ❤️ for financial clarity</Text>
+          <Text style={styles.footerSubtext}>Made with love for financial clarity</Text>
         </View>
       </ScrollView>
 
@@ -220,18 +380,18 @@ export default function ProfileScreen() {
       {showLogoutConfirm && (
         <View style={styles.logoutOverlay}>
           <View style={[styles.logoutModal, { backgroundColor: isDarkMode ? '#1e293b' : '#ffffff' }]}>
-            <Ionicons name="log-out-outline" size={44} color={isDarkMode ? '#22d3ee' : '#0a7ea4'} style={{ alignSelf: 'center', marginBottom: 12 }} />
-            <Text style={[styles.logoutTitle, { color: COLORS.text }]}>Logout?</Text>
+            <Ionicons name="log-out-outline" size={44} color={accent} style={{ alignSelf: 'center', marginBottom: 12 }} />
+            <Text style={[styles.logoutTitle, { color: COLORS.text }]}>{t('profile.logout')}</Text>
             <Text style={[styles.logoutDesc, { color: COLORS.textMuted }]}>Are you sure you want to end your session?</Text>
             <View style={styles.logoutActions}>
               <TouchableOpacity
                 style={[styles.logoutCancelBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : '#f3f4f6' }]}
                 onPress={() => setShowLogoutConfirm(false)}
               >
-                <Text style={[styles.logoutCancelText, { color: COLORS.text }]}>Cancel</Text>
+                <Text style={[styles.logoutCancelText, { color: COLORS.text }]}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.logoutConfirmBtn} onPress={confirmLogout}>
-                <Text style={styles.logoutConfirmText}>Yes, Logout</Text>
+                <Text style={styles.logoutConfirmText}>{t('profile.yesLogout')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -242,7 +402,7 @@ export default function ProfileScreen() {
   );
 }
 
-const createStyles = (COLORS: any, isDarkMode: boolean) => StyleSheet.create({
+const createStyles = (COLORS: any, isDarkMode: boolean, accent: string) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -315,32 +475,45 @@ const createStyles = (COLORS: any, isDarkMode: boolean) => StyleSheet.create({
     right: -10,
     bottom: -10,
     borderRadius: 70,
-    backgroundColor: COLORS.primary + '22',
+    backgroundColor: accent + '22',
     borderWidth: 2,
-    borderColor: COLORS.primary + '44',
+    borderColor: accent + '44',
   },
   avatarContainer: {
     width: 120,
     height: 120,
     borderRadius: 60,
     backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc',
-    padding: 4,
     borderWidth: 2,
-    borderColor: COLORS.primary,
+    borderColor: accent,
     overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   avatarImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 56,
+    borderRadius: 60,
   },
-  badgeContainer: {
+  uploadingOverlay: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: isDarkMode ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.7)',
+  },
+  cameraBadge: {
     position: 'absolute',
-    bottom: 5,
-    right: 5,
-    backgroundColor: isDarkMode ? '#1e293b' : '#fff',
-    borderRadius: 15,
-    padding: 2,
+    bottom: 4,
+    right: 4,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: isDarkMode ? COLORS.background : '#fff',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,

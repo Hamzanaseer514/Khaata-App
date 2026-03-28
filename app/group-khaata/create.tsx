@@ -1,5 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/DarkModeContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { showError, showSuccess } from '@/utils/toast';
 import { router } from 'expo-router';
 import { goBack } from '@/utils/navigation';
@@ -32,6 +33,7 @@ interface Contact {
 export default function CreateGroupTransactionScreen() {
   const { token } = useAuth();
   const { isDarkMode } = useTheme();
+  const { currency: cur } = useCurrency();
   const COLORS = isDarkMode ? config.DARK_COLORS : config.LIGHT_COLORS;
   const accent = isDarkMode ? '#22d3ee' : '#0a7ea4';
   const cardBg = isDarkMode ? COLORS.surface : '#ffffff';
@@ -106,7 +108,7 @@ export default function CreateGroupTransactionScreen() {
       });
       const data = await response.json();
       if (data.success) {
-        showSuccess(`Group transaction created! Per person: Rs ${data.data.perPersonShare}`);
+        showSuccess(`Group transaction created! Per person: ${cur.symbol} ${data.data.perPersonShare}`);
         goBack();
       } else showError(data.message || 'Failed to create');
     } catch (error) {
@@ -138,9 +140,7 @@ export default function CreateGroupTransactionScreen() {
           {item.profilePicture ? (
             <Image source={{ uri: item.profilePicture }} style={{ width: 40, height: 40, borderRadius: 20 }} contentFit="cover" />
           ) : (
-            <Text style={[styles.contactAvatarText, { color: selected ? accent : COLORS.textMuted }]}>
-              {item.name.charAt(0).toUpperCase()}
-            </Text>
+            <Image source={require('../../assets/images/avatar_male_2.png')} style={{ width: 40, height: 40, borderRadius: 20 }} contentFit="cover" />
           )}
         </View>
         <View style={styles.contactInfo}>
@@ -182,7 +182,7 @@ export default function CreateGroupTransactionScreen() {
         <View style={[styles.amountCard, { backgroundColor: cardBg, borderColor }]}>
           <Text style={[styles.sectionLabel, { color: COLORS.textMuted }]}>TOTAL AMOUNT</Text>
           <View style={styles.amountRow}>
-            <Text style={[styles.currencyBig, { color: accent }]}>Rs</Text>
+            <Text style={[styles.currencyBig, { color: accent }]}>{cur.symbol}</Text>
             <TextInput
               style={[styles.amountInputBig, { color: COLORS.text }]}
               placeholder="0"
@@ -239,7 +239,7 @@ export default function CreateGroupTransactionScreen() {
             <Ionicons name="person-outline" size={20} color={COLORS.textMuted} />
             <TextInput
               style={[styles.fieldInput, { color: COLORS.text }]}
-              placeholder="Your share (Rs)"
+              placeholder={`Your share (${cur.symbol})`}
               placeholderTextColor={COLORS.textMuted}
               value={userAmount}
               onChangeText={setUserAmount}
@@ -291,7 +291,7 @@ export default function CreateGroupTransactionScreen() {
             <Text style={[styles.summaryTitle, { color: COLORS.text }]}>Summary</Text>
             <View style={styles.summaryRow}>
               <Text style={[styles.summaryLabel, { color: COLORS.textMuted }]}>Total Amount</Text>
-              <Text style={[styles.summaryValue, { color: COLORS.text }]}>Rs {totalAmount}</Text>
+              <Text style={[styles.summaryValue, { color: COLORS.text }]}>{cur.symbol} {totalAmount}</Text>
             </View>
             <View style={styles.summaryRow}>
               <Text style={[styles.summaryLabel, { color: COLORS.textMuted }]}>Members (incl. You)</Text>
@@ -300,14 +300,14 @@ export default function CreateGroupTransactionScreen() {
             {splitMode === 'equal' ? (
               <View style={styles.summaryRow}>
                 <Text style={[styles.summaryLabel, { color: COLORS.textMuted }]}>Per Person</Text>
-                <Text style={[styles.summaryValue, { color: accent }]}>Rs {perPersonShare()}</Text>
+                <Text style={[styles.summaryValue, { color: accent }]}>{cur.symbol} {perPersonShare()}</Text>
               </View>
             ) : (
               <>
                 <View style={styles.summaryRow}>
                   <Text style={[styles.summaryLabel, { color: COLORS.textMuted }]}>Manual Total</Text>
                   <Text style={[styles.summaryValue, { color: isManualValid() ? COLORS.text : '#ef4444' }]}>
-                    Rs {getTotalManualAmount().toFixed(2)}
+                    {cur.symbol} {getTotalManualAmount().toFixed(2)}
                   </Text>
                 </View>
                 {!isManualValid() && (

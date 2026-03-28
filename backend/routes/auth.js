@@ -373,6 +373,8 @@ router.post('/register', [
           id: user._id,
           name: user.name,
           email: user.email,
+          profilePicture: null,
+          visitingCard: null,
           createdAt: user.createdAt,
           role: resolvedRole,
         },
@@ -449,6 +451,8 @@ router.post('/login', [
           id: user._id,
           name: user.name,
           email: user.email,
+          profilePicture: user.profilePicture || null,
+          visitingCard: user.visitingCard || null,
           createdAt: user.createdAt,
           role: resolvedRole,
         },
@@ -530,6 +534,65 @@ router.post('/change-password', authenticateToken, [
       message: 'Internal server error',
       error: error.message
     });
+  }
+});
+
+// PUT /api/auth/update-profile - Update user profile (name, profilePicture)
+router.put('/update-profile', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const { name, profilePicture, visitingCard } = req.body;
+    if (name && name.trim()) user.name = name.trim();
+    if (profilePicture !== undefined) user.profilePicture = profilePicture;
+    if (visitingCard !== undefined) user.visitingCard = visitingCard;
+
+    await user.save();
+
+    const resolvedRole = resolveRole(user.email, user.role);
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: {
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          profilePicture: user.profilePicture || null,
+          visitingCard: user.visitingCard || null,
+          createdAt: user.createdAt,
+          role: resolvedRole,
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error', error: error.message });
+  }
+});
+
+// POST /api/auth/feedback - Save user feedback
+router.post('/feedback', authenticateToken, async (req, res) => {
+  try {
+    const Feedback = require('../models/Feedback');
+    const { rating, tags, feedback, userName, userEmail } = req.body;
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ success: false, message: 'Rating 1-5 required' });
+    }
+    await Feedback.create({
+      userId: req.userId,
+      userName, userEmail,
+      rating: Math.round(rating),
+      tags: tags || [],
+      feedback: (feedback || '').substring(0, 500),
+    });
+    res.json({ success: true, message: 'Feedback saved' });
+  } catch (error) {
+    console.error('Feedback error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
