@@ -103,30 +103,34 @@ export default function ProfileScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
+      mediaTypes: ['images'],
       quality: 0.7,
     });
 
-    if (result.canceled) return;
+    if (result.canceled || !result.assets || !result.assets[0]) return;
 
-    const localUri = result.assets[0].uri;
+    const asset = result.assets[0];
+    const localUri = asset.uri;
+
+    // Show local preview immediately while uploading
+    await updateUser({ profilePicture: localUri });
     setIsUploading(true);
 
     try {
-      // Upload to Cloudinary
-      const formData = new FormData();
-      const filename = localUri.split('/').pop() || 'photo.jpg';
-      const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1]}` : 'image/jpeg';
-      formData.append('image', { uri: localUri, name: filename, type } as any);
+      // Convert image to base64 for reliable upload on Vercel serverless
+      const base64 = await FileSystem.readAsStringAsync(localUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
 
       const uploadRes = await fetch(`${config.BASE_URL}/upload/image`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-        body: formData,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ base64: `data:image/jpeg;base64,${base64}` }),
       });
+
       const uploadData = await uploadRes.json();
 
       if (!uploadData.success) {
@@ -154,8 +158,8 @@ export default function ProfileScreen() {
       } else {
         showError(profileData.message || 'Failed to update profile');
       }
-    } catch (error) {
-      console.error('Profile picture update error:', error);
+    } catch (error: any) {
+      console.error('Profile picture update error:', error?.message || error);
       showError('Failed to update profile picture');
     } finally {
       setIsUploading(false);

@@ -24,6 +24,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Yup from 'yup';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Contacts from 'expo-contacts';
 import { Image } from 'expo-image';
 import config from '../../config/config';
@@ -132,16 +133,17 @@ export default function AddContactScreen() {
   const uploadToCloudinary = async (uri: string): Promise<string | null> => {
     try {
       setIsUploading(true);
-      const formData = new FormData();
-      const filename = uri.split('/').pop() || 'photo.jpg';
-      const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1]}` : 'image/jpeg';
-      formData.append('image', { uri, name: filename, type } as any);
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
 
       const response = await fetch(`${config.BASE_URL}/upload/image`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-        body: formData,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ base64: `data:image/jpeg;base64,${base64}` }),
       });
       const data = await response.json();
       if (data.success) {
@@ -167,13 +169,11 @@ export default function AddContactScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
+      mediaTypes: ['images'],
       quality: 0.7,
     });
 
-    if (!result.canceled) {
+    if (!result.canceled && result.assets && result.assets[0]) {
       const localUri = result.assets[0].uri;
       setProfileImage(localUri); // Show preview immediately
       const cloudUrl = await uploadToCloudinary(localUri);

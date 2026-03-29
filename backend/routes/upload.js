@@ -32,29 +32,52 @@ const upload = multer({
 });
 
 // POST /api/upload/image - Upload image to Cloudinary
-router.post('/image', authenticateToken, upload.single('image'), async (req, res) => {
+router.post('/image', authenticateToken, async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ success: false, message: 'No image file provided' });
-    }
+    // Try multer first (works locally), fallback to base64 (works on Vercel)
+    await new Promise((resolve, reject) => {
+      upload.single('image')(req, res, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    }).catch(() => null); // Silently ignore multer errors on Vercel
 
-    // Upload buffer to Cloudinary
-    const result = await new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        {
-          folder: 'khaata/profiles',
-          transformation: [
-            { width: 400, height: 400, crop: 'fill', gravity: 'face' },
-            { quality: 'auto', fetch_format: 'auto' },
-          ],
-        },
-        (error, result) => {
-          if (error) reject(error);
-          else resolve(result);
-        }
-      );
-      stream.end(req.file.buffer);
-    });
+    let result;
+
+    if (req.file && req.file.buffer) {
+      // Multer parsed the file (local/traditional hosting)
+      result = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          {
+            folder: 'khaata/profiles',
+            transformation: [
+              { width: 400, height: 400, crop: 'fill', gravity: 'face' },
+              { quality: 'auto', fetch_format: 'auto' },
+            ],
+          },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
+        stream.end(req.file.buffer);
+      });
+    } else if (req.body && req.body.base64) {
+      // Base64 upload (Vercel serverless fallback)
+      const base64Data = req.body.base64.startsWith('data:')
+        ? req.body.base64
+        : `data:image/jpeg;base64,${req.body.base64}`;
+
+      result = await cloudinary.uploader.upload(base64Data, {
+        folder: 'khaata/profiles',
+        transformation: [
+          { width: 400, height: 400, crop: 'fill', gravity: 'face' },
+          { quality: 'auto', fetch_format: 'auto' },
+        ],
+      });
+    } else {
+      return res.status(400).json({ success: false, message: 'No image provided. Send as multipart form-data or base64.' });
+    }
 
     res.json({
       success: true,
