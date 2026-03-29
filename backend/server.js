@@ -64,28 +64,32 @@ const ensureDefaultAdmin = async () => {
 };
 
 // MongoDB connection with caching for serverless (Vercel)
-let isConnected = false;
-const connectDB = async () => {
-  if (isConnected) return;
-  try {
-    await mongoose.connect(process.env.MONGODB_URL, {
+let dbPromise = null;
+const connectDB = () => {
+  if (mongoose.connection.readyState === 1) return Promise.resolve();
+  if (!dbPromise) {
+    dbPromise = mongoose.connect(process.env.MONGODB_URL, {
       bufferCommands: false,
+    }).then(async () => {
+      console.log('MongoDB connected successfully');
+      await ensureDefaultAdmin();
+    }).catch(err => {
+      dbPromise = null;
+      console.error('MongoDB connection error:', err);
+      throw err;
     });
-    isConnected = true;
-    console.log('MongoDB connected successfully');
-    await ensureDefaultAdmin();
-  } catch (err) {
-    console.error('MongoDB connection error:', err);
   }
+  return dbPromise;
 };
 
-// Connect on startup
-connectDB();
-
-// Ensure connection before every request (for serverless cold starts)
+// Ensure connection before every request
 app.use(async (req, res, next) => {
-  await connectDB();
-  next();
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database connection failed' });
+  }
 });
 
 // Routes
