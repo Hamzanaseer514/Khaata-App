@@ -63,13 +63,30 @@ const ensureDefaultAdmin = async () => {
   }
 };
 
-// MongoDB connection
-mongoose.connect(process.env.MONGODB_URL || 'mongodb+srv://khaata:khaata@cluster0.8fo1wsq.mongodb.net/')
-.then(async () => {
-  console.log('MongoDB connected successfully');
-  await ensureDefaultAdmin();
-})
-.catch(err => console.error('MongoDB connection error:', err));
+// MongoDB connection with caching for serverless (Vercel)
+let isConnected = false;
+const connectDB = async () => {
+  if (isConnected) return;
+  try {
+    await mongoose.connect(process.env.MONGODB_URL, {
+      bufferCommands: false,
+    });
+    isConnected = true;
+    console.log('MongoDB connected successfully');
+    await ensureDefaultAdmin();
+  } catch (err) {
+    console.error('MongoDB connection error:', err);
+  }
+};
+
+// Connect on startup
+connectDB();
+
+// Ensure connection before every request (for serverless cold starts)
+app.use(async (req, res, next) => {
+  await connectDB();
+  next();
+});
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));

@@ -102,12 +102,19 @@ export default function ProfileScreen() {
       return;
     }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.7,
-    });
+    let result;
+    try {
+      result = await ImagePicker.launchImageLibraryAsync({
+        quality: 0.7,
+        base64: true,
+        exif: false,
+      });
+    } catch (pickerError: any) {
+      showError('Picker error: ' + (pickerError?.message || 'Unknown'));
+      return;
+    }
 
-    if (result.canceled || !result.assets || !result.assets[0]) return;
+    if (!result || result.canceled || !result.assets?.length) return;
 
     const asset = result.assets[0];
     const localUri = asset.uri;
@@ -117,10 +124,13 @@ export default function ProfileScreen() {
     setIsUploading(true);
 
     try {
-      // Convert image to base64 for reliable upload on Vercel serverless
-      const base64 = await FileSystem.readAsStringAsync(localUri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
+      // Use base64 from picker directly, fallback to FileSystem
+      let base64Data = asset.base64;
+      if (!base64Data) {
+        base64Data = await FileSystem.readAsStringAsync(localUri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+      }
 
       const uploadRes = await fetch(`${config.BASE_URL}/upload/image`, {
         method: 'POST',
@@ -128,7 +138,7 @@ export default function ProfileScreen() {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ base64: `data:image/jpeg;base64,${base64}` }),
+        body: JSON.stringify({ base64: `data:image/jpeg;base64,${base64Data}` }),
       });
 
       const uploadData = await uploadRes.json();

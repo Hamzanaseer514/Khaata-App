@@ -168,12 +168,21 @@ export default function AddContactScreen() {
       return;
     }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.7,
-    });
+    let result;
+    try {
+      result = await ImagePicker.launchImageLibraryAsync({
+        quality: 0.7,
+        base64: true,
+        exif: false,
+      });
+    } catch (pickerError: any) {
+      showError('Picker error: ' + (pickerError?.message || 'Unknown'));
+      return;
+    }
 
-    if (!result.canceled && result.assets && result.assets[0]) {
+    if (!result || result.canceled || !result.assets?.length) return;
+
+    if (result.assets[0]) {
       const localUri = result.assets[0].uri;
       setProfileImage(localUri); // Show preview immediately
       const cloudUrl = await uploadToCloudinary(localUri);

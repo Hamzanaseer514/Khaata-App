@@ -19,7 +19,7 @@
         "foregroundImage": "./assets/images/khaatawise_dark.png",
         "backgroundColor": "#0a0a0c"
       },
-      "edgeToEdgeEnabled": true,
+      "edgeToEdgeEnabled": false,
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "READ_EXTERNAL_STORAGE",
