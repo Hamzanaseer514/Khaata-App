@@ -171,9 +171,7 @@ export default function AddContactScreen() {
     let result;
     try {
       result = await ImagePicker.launchImageLibraryAsync({
-        quality: 0.7,
-        base64: true,
-        exif: false,
+        quality: 0.5,
       });
     } catch (pickerError: any) {
       showError('Picker error: ' + (pickerError?.message || 'Unknown'));
