@@ -20,7 +20,13 @@
         "backgroundColor": "#0a0a0c"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "CAMERA",
+        "READ_MEDIA_IMAGES"
+      ]
     },
     "web": {
       "output": "static",
@@ -28,6 +34,13 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow KhaataWise to access your photos to set profile pictures.",
+          "cameraPermission": "Allow KhaataWise to access your camera to take profile pictures."
+        }
+      ],
       [
         "expo-media-library",
         {
