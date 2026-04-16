@@ -212,6 +212,7 @@ export default function SettingsScreen() {
             <Item icon="information-circle-outline" title={t('settings.appVersion')} subtitle="1.0.0" />
             <Item icon="shield-checkmark-outline" title={t('settings.privacyPolicy')} onPress={() => router.push('/privacy-policy')} />
             <Item icon="document-text-outline" title={t('settings.termsOfService')} onPress={() => router.push('/terms-of-service')} />
+            <Item icon="grid-outline" iconColor="#25d1f4" title="Home Screen Widget" subtitle="Add balance widget" onPress={() => router.push('/widget-preview')} />
             <Item icon="chatbubble-ellipses-outline" title={t('settings.contactSupport')} onPress={() => router.push('/contact-support')} />
             <Item icon="star-outline" iconColor="#fbbf24" title="Rate & Feedback" subtitle="Help us improve" onPress={() => router.push('/feedback')} />
             <Item icon="share-social-outline" iconColor="#22c55e" title="Share KhaataWise" subtitle="Earn 10 coins per share" onPress={async () => {

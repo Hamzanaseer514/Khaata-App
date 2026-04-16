@@ -11,6 +11,10 @@ import { DarkModeProvider, useTheme } from '@/contexts/DarkModeContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { CurrencyProvider } from '@/contexts/CurrencyContext';
 import '@/config/i18n';
+import { registerWidgetTaskHandler } from 'react-native-android-widget';
+import { widgetTaskHandler } from '@/widgets/widget-task-handler';
+
+registerWidgetTaskHandler(widgetTaskHandler);
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -47,6 +51,8 @@ function RootLayoutContent() {
             <Stack.Screen name="group-khaata" options={{ headerShown: false }} />
             <Stack.Screen name="group-khaata/create" options={{ headerShown: false }} />
             <Stack.Screen name="group-khaata/detail" options={{ headerShown: false }} />
+            <Stack.Screen name="mutual-khaata" options={{ headerShown: false }} />
+            <Stack.Screen name="mutual-khaata/detail" options={{ headerShown: false }} />
             <Stack.Screen name="mess" options={{ headerShown: false }} />
             <Stack.Screen name="mess-analytics" options={{ headerShown: false }} />
             <Stack.Screen name="notifications" options={{ headerShown: false }} />
@@ -60,6 +66,7 @@ function RootLayoutContent() {
             <Stack.Screen name="visiting-card" options={{ headerShown: false }} />
             <Stack.Screen name="onboarding" options={{ headerShown: false }} />
             <Stack.Screen name="feedback" options={{ headerShown: false }} />
+            <Stack.Screen name="widget-preview" options={{ headerShown: false }} />
             <Stack.Screen name="admin-alerts" options={{ headerShown: false, presentation: 'transparentModal', animation: 'fade' }} />
             <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
           </Stack>

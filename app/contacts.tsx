@@ -1,6 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { showError } from '@/utils/toast';
+import { showError, showSuccess } from '@/utils/toast';
 import { tapHaptic, heavyHaptic, selectionHaptic } from '@/utils/haptics';
 import { router, useFocusEffect } from 'expo-router';
 import { goBack } from '@/utils/navigation';
@@ -34,6 +34,7 @@ interface Contact {
   phone: string;
   balance: number;
   profilePicture?: string | null;
+  isPinned?: boolean;
   createdAt: string;
   updatedAt: string;
   lastTransactionDate?: string;
@@ -54,6 +55,7 @@ export default function ContactsListScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'all' | 'give' | 'get'>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [menuContact, setMenuContact] = useState<Contact | null>(null);
   const filterAnim = React.useRef(new Animated.Value(0)).current;
 
   const formatLastEntry = (contact: Contact) => {
@@ -185,6 +187,24 @@ export default function ContactsListScreen() {
     }
   };
 
+  const togglePin = async (contact: Contact) => {
+    try {
+      tapHaptic();
+      const id = contact._id || contact.id;
+      const res = await fetch(`${config.BASE_URL}/contacts/${id}/pin`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        showSuccess(data.message);
+        fetchContacts(true);
+      } else showError(data.message);
+    } catch {
+      showError('Failed to update pin');
+    }
+  };
+
   // Search and Filter functionality
   useEffect(() => {
     let filtered = contacts;
@@ -254,13 +274,18 @@ export default function ContactsListScreen() {
             )}
         </View>
         <View style={styles.contactInfo}>
-          <Text 
-            style={[styles.contactName, { color: themeColors.text }]} 
-            numberOfLines={1} 
-            ellipsizeMode="tail"
-          >
-            {item.name}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            {item.isPinned && (
+              <Ionicons name="pin" size={12} color={isDarkMode ? '#22d3ee' : '#0a7ea4'} />
+            )}
+            <Text
+              style={[styles.contactName, { color: themeColors.text, flex: 1 }]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {item.name}
+            </Text>
+          </View>
           <Text style={[styles.contactSubtext, { color: isDarkMode ? '#94a3b8' : '#64748b' }]}>
             {t('contacts.lastEntry')}: {formatLastEntry(item)}
           </Text>
@@ -275,22 +300,15 @@ export default function ContactsListScreen() {
         </View>
       </TouchableOpacity>
       
-      <View style={styles.compactActions}>
-        <TouchableOpacity 
-          style={styles.smallIconBtn} 
-          onPress={() => openEdit(item)}
-          activeOpacity={0.6}
-        >
-          <Ionicons name="pencil" size={14} color={isDarkMode ? '#64748b' : '#94a3b8'} />
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.smallIconBtn} 
-          onPress={() => setConfirmDeleteId(item._id || item.id || '')}
-          activeOpacity={0.6}
-        >
-          <Ionicons name="trash-outline" size={14} color="#ef4444" opacity={0.6} />
-        </TouchableOpacity>
-      </View>
+      {/* Three-dot menu button */}
+      <TouchableOpacity
+        style={styles.menuDotBtn}
+        onPress={() => { tapHaptic(); setMenuContact(item); }}
+        activeOpacity={0.6}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      >
+        <Ionicons name="ellipsis-vertical" size={18} color={isDarkMode ? '#64748b' : '#94a3b8'} />
+      </TouchableOpacity>
     </Animated.View>
   );
 
@@ -526,15 +544,83 @@ export default function ContactsListScreen() {
           keyExtractor={(item) => item._id || item.id || 'unknown'}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                tintColor={accentColor}
-                colors={[accentColor]}
-              />
-            }
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={accentColor}
+              colors={[accentColor]}
+            />
+          }
         />
+      )}
+
+      {/* Three-dot context menu */}
+      {menuContact && (
+        <TouchableOpacity
+          style={styles.menuOverlay}
+          activeOpacity={1}
+          onPress={() => setMenuContact(null)}
+        >
+          <View style={[styles.menuSheet, {
+            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+            borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#e2e8f0',
+          }]}>
+            {/* Contact name header */}
+            <View style={styles.menuHeader}>
+              <Text style={[styles.menuHeaderText, { color: themeColors.text }]} numberOfLines={1}>
+                {menuContact.name}
+              </Text>
+            </View>
+
+            <View style={[styles.menuSeparator, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#f1f5f9' }]} />
+
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => { const c = menuContact; setMenuContact(null); togglePin(c); }}
+            >
+              <View style={[styles.menuIconCircle, { backgroundColor: isDarkMode ? 'rgba(34,211,238,0.1)' : 'rgba(10,126,164,0.08)' }]}>
+                <Ionicons
+                  name={menuContact.isPinned ? 'pin-outline' : 'pin'}
+                  size={18}
+                  color={isDarkMode ? '#22d3ee' : '#0a7ea4'}
+                />
+              </View>
+              <Text style={[styles.menuItemText, { color: themeColors.text }]}>
+                {menuContact.isPinned ? 'Unpin Contact' : 'Pin to Top'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => { const c = menuContact; setMenuContact(null); openEdit(c); }}
+            >
+              <View style={[styles.menuIconCircle, { backgroundColor: isDarkMode ? 'rgba(148,163,184,0.1)' : 'rgba(100,116,139,0.08)' }]}>
+                <Ionicons name="pencil-outline" size={18} color={isDarkMode ? '#94a3b8' : '#64748b'} />
+              </View>
+              <Text style={[styles.menuItemText, { color: themeColors.text }]}>Edit Contact</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => { const id = menuContact._id || menuContact.id || ''; setMenuContact(null); setConfirmDeleteId(id); }}
+            >
+              <View style={[styles.menuIconCircle, { backgroundColor: 'rgba(239,68,68,0.1)' }]}>
+                <Ionicons name="trash-outline" size={18} color="#ef4444" />
+              </View>
+              <Text style={[styles.menuItemText, { color: '#ef4444' }]}>Delete Contact</Text>
+            </TouchableOpacity>
+
+            {/* Cancel */}
+            <View style={[styles.menuSeparator, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#f1f5f9', marginTop: 4 }]} />
+            <TouchableOpacity
+              style={[styles.menuItem, { justifyContent: 'center' }]}
+              onPress={() => setMenuContact(null)}
+            >
+              <Text style={[styles.menuItemText, { color: isDarkMode ? '#64748b' : '#94a3b8', textAlign: 'center' }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
       )}
 
       {/* Delete Confirm */}
@@ -645,16 +731,58 @@ const styles = StyleSheet.create({
     marginTop: 2,
     letterSpacing: 0.5,
   },
-  compactActions: {
-    flexDirection: 'column',
+  menuDotBtn: {
+    padding: 6,
+    marginLeft: 4,
+  },
+  menuOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  menuSheet: {
+    width: '92%',
+    borderRadius: 20,
+    borderWidth: 1,
+    paddingVertical: 8,
+    marginBottom: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  menuHeader: {
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+  },
+  menuHeaderText: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  menuIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
-    gap: 8,
-    marginLeft: 6,
-    width: 24,
     alignItems: 'center',
   },
-  smallIconBtn: {
-    padding: 2,
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    gap: 14,
+  },
+  menuItemText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  menuSeparator: {
+    height: 1,
+    marginHorizontal: 16,
   },
   emptyState: {
     flex: 1,

@@ -33,6 +33,10 @@ const contactSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  isPinned: {
+    type: Boolean,
+    default: false
+  },
   createdAt: {
     type: Date,
     default: Date.now

@@ -11,6 +11,9 @@ import { Image } from 'expo-image';
 import Svg, { G, Path, Circle } from 'react-native-svg';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import BottomNav from '@/components/BottomNav';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { requestWidgetUpdate } from 'react-native-android-widget';
+import { KhaataWidget } from '@/widgets/KhaataWidget';
 
 const { LIGHT_COLORS, DARK_COLORS } = config;
 
@@ -111,6 +114,23 @@ export default function DashboardScreen() {
         setPayablesAmount(pay);
         setContactsOwingCount(recvCount);
         setContactsYouOweCount(payCount);
+
+        // Update widget data
+        try {
+          const wRecv = formatAmount(recv);
+          const wPay = formatAmount(pay);
+          const wNet = formatAmount(recv - pay);
+          const wContacts = String(contacts.length);
+          await AsyncStorage.setItem('widget_data', JSON.stringify({
+            receivable: wRecv, payable: wPay, net: wNet, contacts: wContacts,
+          }));
+          if (Platform.OS === 'android') {
+            requestWidgetUpdate({
+              widgetName: 'KhaataBalance',
+              renderWidget: () => <KhaataWidget receivable={wRecv} payable={wPay} net={wNet} contacts={wContacts} />,
+            }).catch(() => {});
+          }
+        } catch {}
       }
       const resBars = await fetch(`${config.BASE_URL}/transactions/summary/monthly`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -173,6 +193,14 @@ export default function DashboardScreen() {
       onPress: () => { tapHaptic(); router.push('/group-khaata'); }
     },
     {
+      id: 'mutual-khaata',
+      title: t('dashboard.mutual'),
+      description: t('dashboard.sharedLedger'),
+      icon: 'link-outline' as const,
+      color: '#e879f9',
+      onPress: () => { tapHaptic(); router.push('/mutual-khaata'); }
+    },
+    {
       id: 'mess',
       title: t('dashboard.mess'),
       description: t('dashboard.dailyMeals'),
@@ -195,6 +223,14 @@ export default function DashboardScreen() {
       icon: 'document-text-outline' as const,
       color: COLORS.danger,
       onPress: () => { tapHaptic(); router.push('/reports'); }
+    },
+    {
+      id: 'widget',
+      title: 'Widget',
+      description: 'Home screen',
+      icon: 'grid-outline' as const,
+      color: '#25d1f4',
+      onPress: () => { tapHaptic(); router.push('/widget-preview'); }
     },
   ];
 
@@ -264,17 +300,35 @@ export default function DashboardScreen() {
           <View style={styles.glassCard}>
             <View style={styles.glassContent}>
               <Text style={styles.cardLabel}>{t('dashboard.totalOutstanding')}</Text>
-              <Text style={styles.cardValue}>{cur.symbol} {formatAmount(receivablesAmount - payablesAmount)}</Text>
-              <View style={styles.cardFooter}>
-                <View>
-                  <Text style={styles.smallLabel}>{t('dashboard.receivables')}</Text>
-                  <Text style={[styles.smallValue, { color: COLORS.success }]}>{cur.symbol} {formatAmount(receivablesAmount)}</Text>
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={styles.smallLabel}>{t('dashboard.payables')}</Text>
-                  <Text style={[styles.smallValue, { color: COLORS.danger }]}>{cur.symbol} {formatAmount(payablesAmount)}</Text>
-                </View>
-              </View>
+              {isLoading ? (
+                <>
+                  <View style={styles.shimmerLine} />
+                  <View style={styles.cardFooter}>
+                    <View>
+                      <Text style={styles.smallLabel}>{t('dashboard.receivables')}</Text>
+                      <View style={styles.shimmerSmall} />
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={styles.smallLabel}>{t('dashboard.payables')}</Text>
+                      <View style={styles.shimmerSmall} />
+                    </View>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.cardValue}>{cur.symbol} {formatAmount(receivablesAmount - payablesAmount)}</Text>
+                  <View style={styles.cardFooter}>
+                    <View>
+                      <Text style={styles.smallLabel}>{t('dashboard.receivables')}</Text>
+                      <Text style={[styles.smallValue, { color: COLORS.success }]}>{cur.symbol} {formatAmount(receivablesAmount)}</Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={styles.smallLabel}>{t('dashboard.payables')}</Text>
+                      <Text style={[styles.smallValue, { color: COLORS.danger }]}>{cur.symbol} {formatAmount(payablesAmount)}</Text>
+                    </View>
+                  </View>
+                </>
+              )}
             </View>
             <View style={styles.glowEffect} />
           </View>
@@ -663,6 +717,19 @@ const createStyles = (COLORS: any, isDarkMode: boolean) => StyleSheet.create({
   smallValue: {
     fontSize: 16,
     fontWeight: '700',
+  },
+  shimmerLine: {
+    height: 36,
+    width: '60%',
+    borderRadius: 10,
+    backgroundColor: COLORS.surfaceLight,
+    marginBottom: 24,
+  },
+  shimmerSmall: {
+    height: 16,
+    width: 80,
+    borderRadius: 6,
+    backgroundColor: COLORS.surfaceLight,
   },
   glowEffect: {
     position: 'absolute',

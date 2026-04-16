@@ -590,6 +590,7 @@ export default function ContactDetailScreen() {
   const [exporting, setExporting] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [settling, setSettling] = useState(false);
 
   const styles = createStyles(COLORS, isDarkMode);
 
@@ -699,6 +700,40 @@ export default function ContactDetailScreen() {
     if (!contact) return;
     const id = contact._id || contact.id;
     router.push(`/contacts/add?contactId=${id}&editMode=true`);
+  };
+
+  const handleSettleUp = () => {
+    if (!contact || contact.balance === 0) return;
+    const amt = Math.abs(Math.round(contact.balance));
+    const msg = contact.balance > 0
+      ? `${contact.name} owes you ${cur.symbol} ${amt}. Mark as settled?`
+      : `You owe ${contact.name} ${cur.symbol} ${amt}. Mark as settled?`;
+
+    Alert.alert('Settle Up', msg, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Settle Up', onPress: async () => {
+          setSettling(true);
+          try {
+            const res = await fetch(`${config.BASE_URL}/contacts/${actualContactId}/settle`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            });
+            const data = await res.json();
+            if (data.success) {
+              successHaptic();
+              showSuccess('Settled! Balance is now zero.');
+              fetchContactDetails();
+              fetchTransactions();
+            } else showError(data.message);
+          } catch {
+            showError('Failed to settle up');
+          } finally {
+            setSettling(false);
+          }
+        }
+      }
+    ]);
   };
 
   const handleExportTransactions = async (format: 'pdf' | 'csv') => {
@@ -985,6 +1020,35 @@ export default function ContactDetailScreen() {
               <Text style={[styles.footerValue, styles.pendingValue]}>{cur.symbol} {Math.round(Math.abs(contact.balance))}</Text>
             </View>
           </View>
+
+          {contact.balance !== 0 && (
+            <TouchableOpacity
+              style={{
+                marginTop: 20,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingVertical: 14,
+                borderRadius: 16,
+                backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.12)' : 'rgba(16, 185, 129, 0.08)',
+                borderWidth: 1.5,
+                borderColor: isDarkMode ? 'rgba(16, 185, 129, 0.3)' : 'rgba(16, 185, 129, 0.2)',
+                gap: 8,
+              }}
+              onPress={handleSettleUp}
+              disabled={settling}
+              activeOpacity={0.7}
+            >
+              {settling ? (
+                <ActivityIndicator size="small" color="#10b981" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-done-circle" size={20} color="#10b981" />
+                  <Text style={{ color: '#10b981', fontSize: 15, fontWeight: '800' }}>Settle Up</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
         </Animated.View>
 
         {/* Transactions List */}

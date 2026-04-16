@@ -104,14 +104,20 @@ app.use('/api/personal-transactions', require('./routes/personal-transactions'))
 app.use('/api/rewards', require('./routes/rewards'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/upload', require('./routes/upload'));
+app.use('/api/mutual-khaata', require('./routes/mutual-khaata'));
 
 // Basic route
 app.get('/', (req, res) => {
   res.json({ message: 'Khaata Backend API is running!' });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`Server is running on port ${PORT}`);
+  try {
+    await connectDB();
+  } catch (err) {
+    console.error('Failed to connect to MongoDB on startup:', err.message);
+  }
 });
 
 module.exports = app;

@@ -66,7 +66,7 @@ router.get('/', authenticateToken, async (req, res) => {
           userId: 0
         }
       },
-      { $sort: { updatedAt: -1 } } // Keep recently updated contacts at top
+      { $sort: { isPinned: -1, updatedAt: -1 } } // Pinned first, then recently updated
     ]);
 
     res.json({
@@ -329,6 +329,70 @@ router.put('/:id', [
       message: 'Internal server error',
       error: error.message
     });
+  }
+});
+
+// POST /api/contacts/:id/settle - Settle up (reset balance to 0 with a settlement record)
+router.post('/:id/settle', authenticateToken, async (req, res) => {
+  try {
+    const contact = await Contact.findOne({ _id: req.params.id, userId: req.user.userId });
+    if (!contact) {
+      return res.status(404).json({ success: false, message: 'Contact not found' });
+    }
+
+    if (contact.balance === 0) {
+      return res.status(400).json({ success: false, message: 'Balance is already settled' });
+    }
+
+    const settledAmount = Math.abs(contact.balance);
+    // If balance > 0 (friend owes you), friend pays to settle → FRIEND
+    // If balance < 0 (you owe friend), you pay to settle → USER
+    const payer = contact.balance > 0 ? 'FRIEND' : 'USER';
+
+    // Create a settlement transaction
+    const transaction = new Transaction({
+      userId: req.user.userId,
+      contactId: contact._id,
+      amount: settledAmount,
+      payer,
+      note: '✓ Settlement - Balance cleared'
+    });
+    await transaction.save();
+
+    // Reset balance
+    contact.balance = 0;
+    await contact.save();
+
+    res.json({
+      success: true,
+      message: 'Settled up! Balance is now zero.',
+      data: { newBalance: 0, transactionId: transaction._id, settledAmount }
+    });
+  } catch (error) {
+    console.error('Settle up error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// PUT /api/contacts/:id/pin - Toggle pin/unpin a contact
+router.put('/:id/pin', authenticateToken, async (req, res) => {
+  try {
+    const contact = await Contact.findOne({ _id: req.params.id, userId: req.user.userId });
+    if (!contact) {
+      return res.status(404).json({ success: false, message: 'Contact not found' });
+    }
+
+    contact.isPinned = !contact.isPinned;
+    await contact.save();
+
+    res.json({
+      success: true,
+      message: contact.isPinned ? 'Contact pinned!' : 'Contact unpinned',
+      data: { isPinned: contact.isPinned }
+    });
+  } catch (error) {
+    console.error('Pin toggle error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
 

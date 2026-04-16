@@ -61,7 +61,25 @@
           }
         }
       ],
-      "expo-localization"
+      "expo-localization",
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "KhaataBalance",
+              "label": "Khaata Balance",
+              "minWidth": "250dp",
+              "minHeight": "120dp",
+              "description": "Shows your total receivable and payable balances",
+              "previewImage": "./assets/images/khaatawise_dark.png",
+              "resizeMode": "horizontal|vertical",
+              "widgetFeatures": "reconfigurable",
+              "updatePeriodMillis": 1800000
+            }
+          ]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
